@@ -21,11 +21,7 @@ const WorkoutDetailPage = () => {
   const isSubscriptionActive = ['active', 'trial'].includes(subscription?.status) && (!subscription.end_date || new Date(subscription.end_date) > new Date())
   const daysRemaining = subscription?.end_date ? Math.max(0, Math.ceil((new Date(subscription.end_date) - new Date()) / (1000 * 60 * 60 * 24))) : null
 
-  useEffect(() => {
-    loadWorkout()
-  }, [id])
-
-  const loadWorkout = async () => {
+  async function loadWorkout() {
     try {
       setLoading(true)
       setError(null)
@@ -51,6 +47,12 @@ const WorkoutDetailPage = () => {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadWorkout()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
 
   if (loading) {
     return (
@@ -96,12 +98,12 @@ const WorkoutDetailPage = () => {
       }
 
       if (host === 'youtu.be') {
-        const videoId = parsed.pathname.replace('/', '')
+        const videoId = parsed.pathname.split('/').filter(Boolean).pop()
         return videoId ? `https://www.youtube.com/embed/${videoId}` : null
       }
 
       if (host === 'vimeo.com') {
-        const videoId = parsed.pathname.replace('/', '')
+        const videoId = parsed.pathname.split('/').filter(Boolean).pop()
         return videoId ? `https://player.vimeo.com/video/${videoId}` : null
       }
     } catch (error) {

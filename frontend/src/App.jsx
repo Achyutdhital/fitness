@@ -8,6 +8,8 @@ import Footer from './components/Footer'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import SubscriptionsPage from './pages/SubscriptionsPage'
 import DashboardPage from './pages/DashboardPage'
 import WorkoutsPage from './pages/WorkoutsPage'
@@ -17,10 +19,12 @@ import PaymentPage from './pages/PaymentPage'
 import ProfilePage from './pages/ProfilePage'
 import BlogPage from './pages/BlogPage'
 import BlogDetailPage from './pages/BlogDetailPage'
+import PageDetailPage from './pages/PageDetailPage'
 import ContactPage from './pages/ContactPage'
 import AchievementsPage from './pages/AchievementsPage'
 import ChallengesPage from './pages/ChallengesPage'
 import MeasurementsPage from './pages/MeasurementsPage'
+import NotificationsPage from './pages/NotificationsPage'
 import AdminLayout from './pages/admin/AdminLayout'
 import NotFoundPage from './pages/NotFoundPage'
 
@@ -40,9 +44,12 @@ function App() {
                     <Route path="/" element={<LandingPage />} />
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/register" element={<RegisterPage />} />
+                    <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                    <Route path="/reset-password/:uid/:token" element={<ResetPasswordPage />} />
                     <Route path="/subscriptions" element={<SubscriptionsPage />} />
                     <Route path="/blog" element={<BlogPage />} />
                     <Route path="/blog/:slug" element={<BlogDetailPage />} />
+                    <Route path="/pages/:slug" element={<PageDetailPage />} />
                     <Route path="/contact" element={<ContactPage />} />
 
                     {/* Protected */}
@@ -55,6 +62,7 @@ function App() {
                     <Route path="/achievements" element={<ProtectedRoute><AchievementsPage /></ProtectedRoute>} />
                     <Route path="/challenges" element={<ProtectedRoute><ChallengesPage /></ProtectedRoute>} />
                     <Route path="/measurements" element={<ProtectedRoute><MeasurementsPage /></ProtectedRoute>} />
+                    <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
 
                     <Route path="*" element={<NotFoundPage />} />
                   </Routes>

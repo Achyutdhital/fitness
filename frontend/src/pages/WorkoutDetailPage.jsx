@@ -1,31 +1,45 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { workoutAPI } from '../services/api'
+import { coreAPI, workoutAPI } from '../services/api'
 import { useAuth } from '../context/AuthContext'
-import { FiClock, FiZap, FiStar, FiLock, FiCheck, FiArrowLeft } from 'react-icons/fi'
+import { FiClock, FiZap, FiStar, FiLock, FiCheck, FiArrowLeft, FiPlayCircle } from 'react-icons/fi'
 
 const fallbackImage = 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=1600'
 
 const WorkoutDetailPage = () => {
   const { id } = useParams()
-  const { subscription } = useAuth()
+  const { subscription, isAuthenticated } = useAuth()
   const [workout, setWorkout] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [favorited, setFavorited] = useState(false)
+  const [reviews, setReviews] = useState([])
+  const [rating, setRating] = useState(5)
+  const [comment, setComment] = useState('')
+  const [reviewLoading, setReviewLoading] = useState(false)
 
   const isSubscriptionActive = ['active', 'trial'].includes(subscription?.status) && (!subscription.end_date || new Date(subscription.end_date) > new Date())
   const daysRemaining = subscription?.end_date ? Math.max(0, Math.ceil((new Date(subscription.end_date) - new Date()) / (1000 * 60 * 60 * 24))) : null
 
-  useEffect(() => {
-    loadWorkout()
-  }, [id])
-
-  const loadWorkout = async () => {
+  async function loadWorkout() {
     try {
       setLoading(true)
       setError(null)
       const response = await workoutAPI.getWorkoutDetails(id)
       setWorkout(response.data)
+      if (isAuthenticated) {
+        const [favRes, reviewRes] = await Promise.allSettled([
+          coreAPI.getFavoriteWorkouts(),
+          coreAPI.getWorkoutReviews(id),
+        ])
+        if (favRes.status === 'fulfilled') {
+          const favorites = favRes.value.data || []
+          setFavorited(favorites.some((f) => String(f.workout) === String(id)))
+        }
+        if (reviewRes.status === 'fulfilled') {
+          setReviews(reviewRes.value.data || [])
+        }
+      }
     } catch (err) {
       console.error(err)
       setError('Workout details could not be loaded')
@@ -33,6 +47,12 @@ const WorkoutDetailPage = () => {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadWorkout()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
 
   if (loading) {
     return (
@@ -60,6 +80,61 @@ const WorkoutDetailPage = () => {
 
   const locked = !isSubscriptionActive
   const image = workout.thumbnail || fallbackImage
+  const getEmbedVideoUrl = (url) => {
+    if (!url) return null
+    try {
+      const parsed = new URL(url)
+      const host = parsed.hostname.replace('www.', '')
+
+      if (host === 'youtube.com' || host === 'm.youtube.com') {
+        if (parsed.pathname.startsWith('/watch')) {
+          const videoId = parsed.searchParams.get('v')
+          return videoId ? `https://www.youtube.com/embed/${videoId}` : null
+        }
+        if (parsed.pathname.startsWith('/shorts/')) {
+          const videoId = parsed.pathname.split('/shorts/')[1]
+          return videoId ? `https://www.youtube.com/embed/${videoId}` : null
+        }
+      }
+
+      if (host === 'youtu.be') {
+        const videoId = parsed.pathname.split('/').filter(Boolean).pop()
+        return videoId ? `https://www.youtube.com/embed/${videoId}` : null
+      }
+
+      if (host === 'vimeo.com') {
+        const videoId = parsed.pathname.split('/').filter(Boolean).pop()
+        return videoId ? `https://player.vimeo.com/video/${videoId}` : null
+      }
+    } catch (error) {
+      return null
+    }
+    return null
+  }
+
+  const toggleFavorite = async () => {
+    try {
+      const response = await coreAPI.toggleWorkoutFavorite(id)
+      setFavorited(Boolean(response.data?.favorited))
+    } catch (err) {
+      console.error('Failed to toggle favorite:', err)
+    }
+  }
+
+  const submitReview = async (e) => {
+    e.preventDefault()
+    setReviewLoading(true)
+    try {
+      await coreAPI.submitReview(id, rating, comment)
+      const updated = await coreAPI.getWorkoutReviews(id)
+      setReviews(updated.data || [])
+      setComment('')
+    } catch (err) {
+      console.error('Failed to submit review:', err)
+    } finally {
+      setReviewLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
@@ -152,6 +227,35 @@ const WorkoutDetailPage = () => {
                 </div>
               )}
             </div>
+            {workout.video_url && (
+              <div className="rounded-3xl bg-gray-900/80 border border-gray-700 p-8">
+                <h2 className="text-2xl font-black text-white mb-4">Video Tutorial</h2>
+                {getEmbedVideoUrl(workout.video_url) ? (
+                  <div className="aspect-video rounded-2xl overflow-hidden border border-gray-700 mb-4">
+                    <iframe
+                      title={`${workout.title} tutorial`}
+                      src={getEmbedVideoUrl(workout.video_url)}
+                      className="w-full h-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                    />
+                  </div>
+                ) : (
+                  <p className="text-gray-300 text-sm mb-4">
+                    This workout includes a guided training video. Open it to follow along with the trainer.
+                  </p>
+                )}
+                <a
+                  href={workout.video_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-primary inline-flex items-center gap-2"
+                >
+                  <FiPlayCircle />
+                  <span>Watch Full Tutorial</span>
+                </a>
+              </div>
+            )}
 
             <div className="rounded-3xl bg-gray-900/80 border border-gray-700 p-8">
               <h2 className="text-2xl font-black text-white mb-4">Exercises</h2>
@@ -171,11 +275,62 @@ const WorkoutDetailPage = () => {
                         </div>
                       </div>
                       <p className="text-gray-300 text-sm leading-relaxed">{exercise.instructions || exercise.description}</p>
+                      {exercise.video_url && (
+                        <a
+                          href={exercise.video_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 mt-3 text-orange-300 hover:text-orange-200 text-sm font-semibold"
+                        >
+                          <FiPlayCircle />
+                          <span>Watch exercise tutorial</span>
+                        </a>
+                      )}
                     </div>
                   ))}
                 </div>
               ) : (
                 <p className="text-gray-400 text-sm">Exercise breakdown will appear once it is added in CMS.</p>
+              )}
+            </div>
+            <div className="rounded-3xl bg-gray-900/80 border border-gray-700 p-8">
+              <h2 className="text-2xl font-black text-white mb-4">Ratings & Reviews</h2>
+              <form onSubmit={submitReview} className="mb-6 space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <select
+                    value={rating}
+                    onChange={(e) => setRating(Number(e.target.value))}
+                    className="input-field bg-gray-800 text-white border-gray-700"
+                  >
+                    {[5, 4, 3, 2, 1].map((r) => (
+                      <option key={r} value={r}>{r} Star{r > 1 ? 's' : ''}</option>
+                    ))}
+                  </select>
+                  <input
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder="Write your review..."
+                    className="input-field md:col-span-3 bg-gray-800 text-white border-gray-700"
+                  />
+                </div>
+                <button type="submit" disabled={reviewLoading} className="btn btn-primary">
+                  {reviewLoading ? 'Submitting...' : 'Submit Review'}
+                </button>
+              </form>
+              {reviews.length === 0 ? (
+                <p className="text-gray-400 text-sm">No reviews yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {reviews.map((review) => (
+                    <div key={review.id} className="rounded-xl border border-gray-700 bg-gray-800 p-4">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-white font-semibold">{review.username}</p>
+                        <p className="text-orange-300 text-sm">{'★'.repeat(review.rating)}</p>
+                      </div>
+                      <p className="text-gray-300 text-sm">{review.comment || 'No comment provided.'}</p>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>
@@ -204,6 +359,11 @@ const WorkoutDetailPage = () => {
                     <p className="text-xs text-green-100/80">This workout is unlocked for your plan.</p>
                   </div>
                 </div>
+              )}
+              {!locked && (
+                <button onClick={toggleFavorite} className="btn btn-primary w-full mt-4">
+                  {favorited ? 'Remove from Favorites' : 'Add to Favorites'}
+                </button>
               )}
             </div>
 

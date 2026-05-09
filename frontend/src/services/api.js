@@ -85,13 +85,13 @@ export const workoutAPI = {
 
 // Payment APIs
 export const paymentAPI = {
-  createPaymentIntent: (planId) => api.post('/payments/payments/create_payment_intent/', { plan_id: planId }),
+  createPaymentIntent: (planId, couponCode = '') => api.post('/payments/payments/create_payment_intent/', { plan_id: planId, coupon_code: couponCode }),
   confirmPayment: (paymentIntentId, planId) => api.post('/payments/payments/confirm_payment/', { payment_intent_id: paymentIntentId, plan_id: planId }),
   getPayments: () => api.get('/payments/payments/my_payments/'),
   cancelSubscription: () => api.post('/payments/payments/cancel_subscription/', {}),
   requestRefund: (paymentId, reason) => api.post('/payments/payments/create_refund/', { payment_id: paymentId, reason }),
   getInvoices: () => api.get('/payments/invoices/my_invoices/'),
-  downloadInvoice: (invoiceId) => api.get(`/payments/invoices/download_invoice/${invoiceId}/`),
+  downloadInvoice: (invoiceId) => api.get(`/payments/invoices/download/${invoiceId}/`),
 }
 
 // Core APIs - Gamification, Favorites, Reviews, Measurements, Notifications, Coupons
@@ -164,7 +164,6 @@ export const cmsAPI = {
   // Contact Form
   submitContact: (data) => api.post('/cms/contact/', data),
   getContactMessages: () => api.get('/cms/contact/'),
-  updateSettings: (data) => api.put('/cms/settings/', data),
   
   // Dynamic Pages
   getPages: () => api.get('/cms/pages/'),

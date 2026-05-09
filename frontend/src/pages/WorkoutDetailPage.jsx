@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { workoutAPI } from '../services/api'
+import { coreAPI, workoutAPI } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { FiClock, FiZap, FiStar, FiLock, FiCheck, FiArrowLeft } from 'react-icons/fi'
 
@@ -8,10 +8,15 @@ const fallbackImage = 'https://images.unsplash.com/photo-1517836357463-d25dfeac3
 
 const WorkoutDetailPage = () => {
   const { id } = useParams()
-  const { subscription } = useAuth()
+  const { subscription, isAuthenticated } = useAuth()
   const [workout, setWorkout] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [favorited, setFavorited] = useState(false)
+  const [reviews, setReviews] = useState([])
+  const [rating, setRating] = useState(5)
+  const [comment, setComment] = useState('')
+  const [reviewLoading, setReviewLoading] = useState(false)
 
   const isSubscriptionActive = ['active', 'trial'].includes(subscription?.status) && (!subscription.end_date || new Date(subscription.end_date) > new Date())
   const daysRemaining = subscription?.end_date ? Math.max(0, Math.ceil((new Date(subscription.end_date) - new Date()) / (1000 * 60 * 60 * 24))) : null
@@ -26,6 +31,19 @@ const WorkoutDetailPage = () => {
       setError(null)
       const response = await workoutAPI.getWorkoutDetails(id)
       setWorkout(response.data)
+      if (isAuthenticated) {
+        const [favRes, reviewRes] = await Promise.allSettled([
+          coreAPI.getFavoriteWorkouts(),
+          coreAPI.getWorkoutReviews(id),
+        ])
+        if (favRes.status === 'fulfilled') {
+          const favorites = favRes.value.data || []
+          setFavorited(favorites.some((f) => String(f.workout) === String(id)))
+        }
+        if (reviewRes.status === 'fulfilled') {
+          setReviews(reviewRes.value.data || [])
+        }
+      }
     } catch (err) {
       console.error(err)
       setError('Workout details could not be loaded')
@@ -60,6 +78,30 @@ const WorkoutDetailPage = () => {
 
   const locked = !isSubscriptionActive
   const image = workout.thumbnail || fallbackImage
+
+  const toggleFavorite = async () => {
+    try {
+      const response = await coreAPI.toggleWorkoutFavorite(id)
+      setFavorited(Boolean(response.data?.favorited))
+    } catch (err) {
+      console.error('Failed to toggle favorite:', err)
+    }
+  }
+
+  const submitReview = async (e) => {
+    e.preventDefault()
+    setReviewLoading(true)
+    try {
+      await coreAPI.submitReview(id, rating, comment)
+      const updated = await coreAPI.getWorkoutReviews(id)
+      setReviews(updated.data || [])
+      setComment('')
+    } catch (err) {
+      console.error('Failed to submit review:', err)
+    } finally {
+      setReviewLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
@@ -178,6 +220,46 @@ const WorkoutDetailPage = () => {
                 <p className="text-gray-400 text-sm">Exercise breakdown will appear once it is added in CMS.</p>
               )}
             </div>
+            <div className="rounded-3xl bg-gray-900/80 border border-gray-700 p-8">
+              <h2 className="text-2xl font-black text-white mb-4">Ratings & Reviews</h2>
+              <form onSubmit={submitReview} className="mb-6 space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <select
+                    value={rating}
+                    onChange={(e) => setRating(Number(e.target.value))}
+                    className="input-field bg-gray-800 text-white border-gray-700"
+                  >
+                    {[5, 4, 3, 2, 1].map((r) => (
+                      <option key={r} value={r}>{r} Star{r > 1 ? 's' : ''}</option>
+                    ))}
+                  </select>
+                  <input
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder="Write your review..."
+                    className="input-field md:col-span-3 bg-gray-800 text-white border-gray-700"
+                  />
+                </div>
+                <button type="submit" disabled={reviewLoading} className="btn btn-primary">
+                  {reviewLoading ? 'Submitting...' : 'Submit Review'}
+                </button>
+              </form>
+              {reviews.length === 0 ? (
+                <p className="text-gray-400 text-sm">No reviews yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {reviews.map((review) => (
+                    <div key={review.id} className="rounded-xl border border-gray-700 bg-gray-800 p-4">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-white font-semibold">{review.username}</p>
+                        <p className="text-orange-300 text-sm">{'★'.repeat(review.rating)}</p>
+                      </div>
+                      <p className="text-gray-300 text-sm">{review.comment || 'No comment provided.'}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <aside className="space-y-6">
@@ -204,6 +286,11 @@ const WorkoutDetailPage = () => {
                     <p className="text-xs text-green-100/80">This workout is unlocked for your plan.</p>
                   </div>
                 </div>
+              )}
+              {!locked && (
+                <button onClick={toggleFavorite} className="btn btn-primary w-full mt-4">
+                  {favorited ? 'Remove from Favorites' : 'Add to Favorites'}
+                </button>
               )}
             </div>
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { subscriptionAPI, paymentAPI } from '../services/api'
+import { subscriptionAPI, paymentAPI, coreAPI } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { FiCheck, FiCreditCard, FiLock, FiStar } from 'react-icons/fi'
 
@@ -22,11 +22,15 @@ const PaymentPage = () => {
   const [processing, setProcessing] = useState(false)
   const [message, setMessage] = useState('')
   const [paymentIntent, setPaymentIntent] = useState(null)
+  const [couponCode, setCouponCode] = useState('')
+  const [couponStatus, setCouponStatus] = useState(null)
+  const [referral, setReferral] = useState(null)
 
   const isSubscriptionActive = ['active', 'trial'].includes(subscription?.status) && (!subscription.end_date || new Date(subscription.end_date) > new Date())
 
   useEffect(() => {
     loadPlans()
+    loadReferral()
   }, [])
 
   const loadPlans = async () => {
@@ -45,14 +49,44 @@ const PaymentPage = () => {
     }
   }
 
+  const loadReferral = async () => {
+    try {
+      const response = await coreAPI.getMyReferral()
+      setReferral(response.data)
+    } catch (error) {
+      setReferral(null)
+    }
+  }
+
   const currentPlan = useMemo(() => plans.find((plan) => plan.id === selectedPlan?.id) || selectedPlan, [plans, selectedPlan])
+  const discountedAmount = useMemo(() => {
+    if (!currentPlan) return 0
+    if (!couponStatus?.valid) return Number(currentPlan.price)
+    if (couponStatus.discount_type === 'percentage') {
+      return Math.max(Number(currentPlan.price) * (1 - Number(couponStatus.discount_value) / 100), 0.5)
+    }
+    return Math.max(Number(currentPlan.price) - Number(couponStatus.discount_value), 0.5)
+  }, [currentPlan, couponStatus])
+
+  const applyCoupon = async () => {
+    if (!couponCode || !currentPlan) return
+    setMessage('')
+    try {
+      const response = await coreAPI.validateCoupon(couponCode, currentPlan.id)
+      setCouponStatus(response.data)
+      setMessage('Coupon applied successfully.')
+    } catch (error) {
+      setCouponStatus(null)
+      setMessage(error.response?.data?.error || 'Invalid coupon code.')
+    }
+  }
 
   const startPayment = async () => {
     if (!currentPlan) return
     setProcessing(true)
     setMessage('')
     try {
-      const response = await paymentAPI.createPaymentIntent(currentPlan.id)
+      const response = await paymentAPI.createPaymentIntent(currentPlan.id, couponStatus?.valid ? couponCode : '')
       setPaymentIntent(response.data)
       setMessage('Payment intent created. Complete your Stripe checkout to finalize the subscription.')
     } catch (error) {
@@ -139,6 +173,25 @@ const PaymentPage = () => {
                 <span>{processing ? 'Starting payment...' : 'Start Payment'}</span>
               </button>
             </div>
+            <div className="rounded-3xl bg-gray-900/80 border border-gray-700 p-6">
+              <h2 className="text-white font-bold text-2xl mb-4">Coupon</h2>
+              <div className="flex gap-3">
+                <input
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                  placeholder="Enter coupon code"
+                  className="input-field bg-gray-800 text-white border-gray-700"
+                />
+                <button onClick={applyCoupon} className="btn btn-primary" disabled={!couponCode || !currentPlan}>
+                  Apply
+                </button>
+              </div>
+              {couponStatus?.valid && (
+                <p className="text-green-300 text-sm mt-3">
+                  Applied: {couponStatus.discount_type === 'percentage' ? `${couponStatus.discount_value}% off` : `$${couponStatus.discount_value} off`}
+                </p>
+              )}
+            </div>
           </div>
 
           <aside className="space-y-6">
@@ -156,8 +209,14 @@ const PaymentPage = () => {
                   </div>
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-gray-400">Price</span>
-                    <span className="text-white font-semibold">${currentPlan.price}</span>
+                    <span className="text-white font-semibold">${Number(currentPlan.price).toFixed(2)}</span>
                   </div>
+                  {couponStatus?.valid && (
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-gray-400">Discounted</span>
+                      <span className="text-green-300 font-semibold">${discountedAmount.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-gray-400">Duration</span>
                     <span className="text-white font-semibold">{currentPlan.duration_days} days</span>
@@ -184,8 +243,18 @@ const PaymentPage = () => {
                 <div className="space-y-2 text-sm text-gray-300">
                   <p><span className="text-gray-500">Plan:</span> {paymentIntent.plan}</p>
                   <p><span className="text-gray-500">Amount:</span> ${paymentIntent.amount} {paymentIntent.currency}</p>
+                  {paymentIntent.original_amount && paymentIntent.original_amount !== paymentIntent.amount && (
+                    <p><span className="text-gray-500">Original:</span> ${paymentIntent.original_amount}</p>
+                  )}
                   <p className="break-all"><span className="text-gray-500">Client Secret:</span> {paymentIntent.client_secret}</p>
                 </div>
+              </div>
+            )}
+            {referral && (
+              <div className="rounded-3xl bg-gray-900/80 border border-gray-700 p-6">
+                <h2 className="text-white font-bold text-xl mb-3">Your Referral</h2>
+                <p className="text-gray-300 text-sm mb-2">Code: <span className="font-bold text-orange-300">{referral.referral_code}</span></p>
+                <p className="text-gray-400 text-xs break-all">{referral.referral_link}</p>
               </div>
             )}
           </aside>

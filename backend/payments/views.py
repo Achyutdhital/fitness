@@ -14,6 +14,7 @@ from .models import Payment, Invoice, Refund
 from .serializers import PaymentSerializer, InvoiceSerializer, RefundSerializer
 from accounts.models import UserSubscription
 from subscriptions.models import SubscriptionPlan
+from core.models import Coupon
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -22,11 +23,43 @@ class PaymentViewSet(viewsets.ViewSet):
     """Handle payments and subscriptions"""
     permission_classes = [IsAuthenticated]
 
+    def _apply_coupon_discount(self, plan_price, coupon_code):
+        if not coupon_code:
+            return plan_price, None
+
+        code = str(coupon_code).strip().upper()
+        if not code:
+            return plan_price, None
+
+        try:
+            coupon = Coupon.objects.get(code=code)
+        except Coupon.DoesNotExist:
+            return None, {'error': 'Invalid coupon code'}
+
+        valid, message = coupon.is_valid()
+        if not valid:
+            return None, {'error': message}
+
+        if plan_price < coupon.min_purchase_amount:
+            return None, {'error': f'Minimum purchase amount for this coupon is {coupon.min_purchase_amount}'}
+
+        discounted = Decimal(plan_price)
+        if coupon.discount_type == 'percentage':
+            discounted = discounted - (discounted * Decimal(coupon.discount_value) / Decimal('100'))
+        else:
+            discounted = discounted - Decimal(coupon.discount_value)
+
+        if discounted <= Decimal('0'):
+            discounted = Decimal('0.50')
+
+        return discounted.quantize(Decimal('0.01')), coupon
+
     @action(detail=False, methods=['post'])
     def create_payment_intent(self, request):
         """Create a Stripe payment intent for subscription"""
         user = request.user
         plan_id = request.data.get('plan_id')
+        coupon_code = request.data.get('coupon_code')
         
         try:
             plan = SubscriptionPlan.objects.get(id=plan_id)
@@ -48,8 +81,12 @@ class PaymentViewSet(viewsets.ViewSet):
             else:
                 customer_id = user.subscription.stripe_customer_id
             
-            # Create payment intent
-            amount = int(float(plan.price) * 100)  # Convert to cents
+            final_price, coupon = self._apply_coupon_discount(plan.price, coupon_code)
+            if final_price is None:
+                return Response(coupon, status=status.HTTP_400_BAD_REQUEST)
+            if coupon and coupon.applicable_plans.exists() and not coupon.applicable_plans.filter(id=plan.id).exists():
+                return Response({'error': 'Coupon is not applicable to this plan'}, status=status.HTTP_400_BAD_REQUEST)
+            amount = int(float(final_price) * 100)  # Convert to cents
             
             intent = stripe.PaymentIntent.create(
                 amount=amount,
@@ -58,16 +95,19 @@ class PaymentViewSet(viewsets.ViewSet):
                 metadata={
                     'user_id': str(user.id),
                     'plan_id': str(plan.id),
-                    'plan_name': plan.name
+                    'plan_name': plan.name,
+                    'coupon_code': coupon.code if coupon else '',
                 }
             )
             
             return Response({
                 'client_secret': intent.client_secret,
                 'payment_intent_id': intent.id,
-                'amount': plan.price,
+                'amount': final_price,
+                'original_amount': plan.price,
                 'currency': plan.currency,
-                'plan': plan.name
+                'plan': plan.name,
+                'coupon_applied': coupon.code if coupon else None,
             })
         
         except stripe.error.StripeError as e:
@@ -109,16 +149,26 @@ class PaymentViewSet(viewsets.ViewSet):
                     user_subscription.save()
                 
                 # Create payment record
+                paid_amount = Decimal(str(intent.amount_received or intent.amount or 0)) / Decimal('100')
                 payment = Payment.objects.create(
                     user=user,
                     subscription_plan=plan,
                     stripe_payment_id=payment_intent_id,
-                    amount=plan.price,
+                    amount=paid_amount,
                     currency=plan.currency,
                     status='completed',
                     payment_method='stripe_card',
                     description=f"Subscription to {plan.name}"
                 )
+
+                coupon_code = (intent.metadata or {}).get('coupon_code')
+                if coupon_code:
+                    try:
+                        coupon = Coupon.objects.get(code=coupon_code)
+                        coupon.times_used += 1
+                        coupon.save(update_fields=['times_used'])
+                    except Coupon.DoesNotExist:
+                        pass
                 
                 # Create invoice
                 invoice_number = f"INV-{user.id}-{timezone.now().strftime('%Y%m%d%H%M%S')}"
@@ -128,7 +178,7 @@ class PaymentViewSet(viewsets.ViewSet):
                     stripe_invoice_id=payment_intent_id,
                     invoice_number=invoice_number,
                     status='paid',
-                    amount=plan.price,
+                    amount=paid_amount,
                     currency=plan.currency,
                     issue_date=timezone.now().date(),
                     due_date=(timezone.now() + timedelta(days=30)).date(),

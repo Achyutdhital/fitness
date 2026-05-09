@@ -1,9 +1,11 @@
 import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { FiUser, FiMail, FiLock } from 'react-icons/fi'
 
 const RegisterPage = () => {
+  const location = useLocation()
+  const params = new URLSearchParams(location.search)
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -11,6 +13,9 @@ const RegisterPage = () => {
     password2: '',
     first_name: '',
     last_name: '',
+    fitness_level: 'beginner',
+    fitness_goal: '',
+    referral_code: params.get('ref') || '',
   })
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -119,6 +124,54 @@ const RegisterPage = () => {
                   placeholder="Last name"
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="fitness_level" className="block text-sm font-medium text-gray-700 mb-1">
+                  Fitness Level
+                </label>
+                <select
+                  id="fitness_level"
+                  name="fitness_level"
+                  value={formData.fitness_level}
+                  onChange={handleChange}
+                  className="input-field text-sm"
+                >
+                  <option value="beginner">Beginner</option>
+                  <option value="intermediate">Intermediate</option>
+                  <option value="advanced">Advanced</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="fitness_goal" className="block text-sm font-medium text-gray-700 mb-1">
+                  Primary Goal
+                </label>
+                <input
+                  type="text"
+                  id="fitness_goal"
+                  name="fitness_goal"
+                  value={formData.fitness_goal}
+                  onChange={handleChange}
+                  className="input-field text-sm"
+                  placeholder="e.g. lose weight, build strength"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="referral_code" className="block text-sm font-medium text-gray-700 mb-1">
+                Referral Code (optional)
+              </label>
+              <input
+                type="text"
+                id="referral_code"
+                name="referral_code"
+                value={formData.referral_code}
+                onChange={handleChange}
+                className="input-field text-sm"
+                placeholder="Enter referral code"
+              />
             </div>
 
             <div>

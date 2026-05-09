@@ -68,7 +68,7 @@ const Navbar = () => {
           {isAuthenticated ? (
             <>
               {/* Notification Bell */}
-              <Link to="/dashboard" className="relative p-2 text-gray-400 hover:text-orange-400 transition-colors">
+              <Link to="/notifications" className="relative p-2 text-gray-400 hover:text-orange-400 transition-colors">
                 <FiBell size={20} />
                 {unreadCount > 0 && (
                   <span className="absolute top-1 right-1 w-4 h-4 bg-orange-500 rounded-full text-white text-xs flex items-center justify-center font-bold">

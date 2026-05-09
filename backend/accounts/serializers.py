@@ -8,10 +8,20 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
     password2 = serializers.CharField(write_only=True, min_length=8)
     referral_code = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    fitness_level = serializers.ChoiceField(
+        choices=['beginner', 'intermediate', 'advanced'],
+        required=False
+    )
+    fitness_goal = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = CustomUser
-        fields = ['username', 'email', 'password', 'password2', 'first_name', 'last_name', 'referral_code']
+        fields = [
+            'username', 'email', 'password', 'password2',
+            'first_name', 'last_name',
+            'fitness_level', 'fitness_goal',
+            'referral_code',
+        ]
 
     def validate(self, attrs):
         if attrs['password'] != attrs['password2']:
@@ -21,10 +31,17 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data.pop('password2')
         referral_code = validated_data.pop('referral_code', None)
+        fitness_goal = validated_data.pop('fitness_goal', '').strip()
         password = validated_data.pop('password')
         user = CustomUser(**validated_data)
         user.set_password(password)
         user.save()
+
+        if fitness_goal:
+            UserProfile.objects.update_or_create(
+                user=user,
+                defaults={'goals': fitness_goal},
+            )
 
         # Handle referral
         if referral_code:

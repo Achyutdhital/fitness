@@ -19,8 +19,9 @@ const ProfilePage = () => {
     gender: '',
     height: '',
     weight: '',
-    fitness_goal: '',
+    fitness_level: 'beginner',
   })
+  const [profileDetails, setProfileDetails] = useState({ goals: '' })
 
   const [passwordData, setPasswordData] = useState({
     old_password: '',
@@ -39,11 +40,23 @@ const ProfilePage = () => {
         gender: user.gender || '',
         height: user.height || '',
         weight: user.weight || '',
-        fitness_goal: user.fitness_goal || '',
+        fitness_level: user.fitness_level || 'beginner',
       })
     }
+    loadProfileDetails()
     loadPayments()
   }, [user])
+
+  const loadProfileDetails = async () => {
+    try {
+      const response = await authAPI.getProfileDetails()
+      setProfileDetails({
+        goals: response.data?.goals || '',
+      })
+    } catch (error) {
+      console.error('Failed to load profile details:', error)
+    }
+  }
 
   const loadPayments = async () => {
     try {
@@ -62,6 +75,7 @@ const ProfilePage = () => {
     try {
       const result = await updateProfile(profileData)
       if (result.success) {
+        await authAPI.updateProfileDetails({ goals: profileDetails.goals })
         setMessage({ type: 'success', text: 'Profile updated successfully!' })
         await fetchUser()
       } else {
@@ -101,7 +115,7 @@ const ProfilePage = () => {
   const stats = [
     { label: 'Current Weight', value: `${user?.weight || 0} kg`, icon: FiTrendingUp, color: 'from-blue-500 to-cyan-500' },
     { label: 'Height', value: `${user?.height || 0} cm`, icon: FiActivity, color: 'from-green-500 to-teal-500' },
-    { label: 'Fitness Goal', value: user?.fitness_goal || 'Not set', icon: FiTarget, color: 'from-orange-500 to-pink-500' },
+    { label: 'Fitness Level', value: user?.fitness_level || 'Not set', icon: FiTarget, color: 'from-orange-500 to-pink-500' },
     { label: 'Member Since', value: user?.date_joined ? new Date(user.date_joined).toLocaleDateString() : 'N/A', icon: FiAward, color: 'from-purple-500 to-indigo-500' },
   ]
 
@@ -214,9 +228,9 @@ const ProfilePage = () => {
                     className="input-field bg-gray-900 text-white border-gray-700"
                   >
                     <option value="">Select</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
+                    <option value="M">Male</option>
+                    <option value="F">Female</option>
+                    <option value="O">Other</option>
                   </select>
                 </div>
                 <div>
@@ -238,21 +252,27 @@ const ProfilePage = () => {
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-gray-300 font-medium mb-2">Fitness Goal</label>
-                  <select
-                    value={profileData.fitness_goal}
-                    onChange={(e) => setProfileData({ ...profileData, fitness_goal: e.target.value })}
-                    className="input-field bg-gray-900 text-white border-gray-700"
-                  >
-                    <option value="">Select your goal</option>
-                    <option value="weight_loss">Weight Loss</option>
-                    <option value="muscle_gain">Muscle Gain</option>
-                    <option value="endurance">Build Endurance</option>
-                    <option value="flexibility">Improve Flexibility</option>
-                    <option value="general_fitness">General Fitness</option>
-                  </select>
-                </div>
-              </div>
+                   <label className="block text-gray-300 font-medium mb-2">Fitness Level</label>
+                   <select
+                     value={profileData.fitness_level}
+                     onChange={(e) => setProfileData({ ...profileData, fitness_level: e.target.value })}
+                     className="input-field bg-gray-900 text-white border-gray-700"
+                   >
+                     <option value="beginner">Beginner</option>
+                     <option value="intermediate">Intermediate</option>
+                     <option value="advanced">Advanced</option>
+                   </select>
+                 </div>
+                 <div className="md:col-span-2">
+                   <label className="block text-gray-300 font-medium mb-2">Primary Fitness Goal</label>
+                   <textarea
+                     value={profileDetails.goals}
+                     onChange={(e) => setProfileDetails({ ...profileDetails, goals: e.target.value })}
+                     className="input-field bg-gray-900 text-white border-gray-700 min-h-24"
+                     placeholder="Describe your goal (fat loss, strength, endurance, etc.)"
+                   />
+                 </div>
+               </div>
 
               <button type="submit" disabled={loading} className="btn btn-primary flex items-center space-x-2">
                 <FiSave />

@@ -110,8 +110,8 @@ cd backend
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
-cp .env .env.local
-# Edit .env.local with your settings
+copy .env.example .env
+# Edit .env with your settings
 python manage.py migrate
 python manage.py createsuperuser
 python manage.py runserver
@@ -121,10 +121,19 @@ python manage.py runserver
 ```bash
 cd frontend
 npm install
-cp .env .env.local
-# Edit .env.local with your settings
+copy .env.example .env
+# Edit .env with your settings
 npm run dev
 ```
+
+### Environment Files
+
+Use the provided example files as templates:
+
+- `backend/.env.example` for Django, Stripe, email, and CORS settings
+- `frontend/.env.example` for the Vite API base URL
+
+Keep your real `.env` files local and out of Git.
 
 ## 🌐 Access Points
 

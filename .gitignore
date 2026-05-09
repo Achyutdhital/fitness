@@ -42,8 +42,11 @@ dist/
 
 # Environment files
 .env
-.env.*
 .env.local
+*.env
+!.env.example
+!backend/.env.example
+!frontend/.env.example
 
 # IDEs and editors
 .vscode/

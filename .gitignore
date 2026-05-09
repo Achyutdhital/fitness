@@ -74,23 +74,3 @@ coverage.xml
 
 # Pipenv
 .Pipfile.lock
-# Root .gitignore
-.env
-.env.local
-.DS_Store
-*.log
-node_modules/
-dist/
-build/
-__pycache__/
-*.pyc
-*.pyo
-.vscode/
-.idea/
-venv/
-env/
-db.sqlite3
-*.egg-info/
-.coverage
-htmlcov/
-.pytest_cache/

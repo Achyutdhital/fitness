@@ -19,6 +19,7 @@ import PaymentPage from './pages/PaymentPage'
 import ProfilePage from './pages/ProfilePage'
 import BlogPage from './pages/BlogPage'
 import BlogDetailPage from './pages/BlogDetailPage'
+import PageDetailPage from './pages/PageDetailPage'
 import ContactPage from './pages/ContactPage'
 import AchievementsPage from './pages/AchievementsPage'
 import ChallengesPage from './pages/ChallengesPage'
@@ -48,6 +49,7 @@ function App() {
                     <Route path="/subscriptions" element={<SubscriptionsPage />} />
                     <Route path="/blog" element={<BlogPage />} />
                     <Route path="/blog/:slug" element={<BlogDetailPage />} />
+                    <Route path="/pages/:slug" element={<PageDetailPage />} />
                     <Route path="/contact" element={<ContactPage />} />
 
                     {/* Protected */}

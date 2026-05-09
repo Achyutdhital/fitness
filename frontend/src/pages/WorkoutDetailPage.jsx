@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { coreAPI, workoutAPI } from '../services/api'
 import { useAuth } from '../context/AuthContext'
-import { FiClock, FiZap, FiStar, FiLock, FiCheck, FiArrowLeft } from 'react-icons/fi'
+import { FiClock, FiZap, FiStar, FiLock, FiCheck, FiArrowLeft, FiPlayCircle } from 'react-icons/fi'
 
 const fallbackImage = 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=1600'
 
@@ -78,6 +78,37 @@ const WorkoutDetailPage = () => {
 
   const locked = !isSubscriptionActive
   const image = workout.thumbnail || fallbackImage
+  const getEmbedVideoUrl = (url) => {
+    if (!url) return null
+    try {
+      const parsed = new URL(url)
+      const host = parsed.hostname.replace('www.', '')
+
+      if (host === 'youtube.com' || host === 'm.youtube.com') {
+        if (parsed.pathname.startsWith('/watch')) {
+          const videoId = parsed.searchParams.get('v')
+          return videoId ? `https://www.youtube.com/embed/${videoId}` : null
+        }
+        if (parsed.pathname.startsWith('/shorts/')) {
+          const videoId = parsed.pathname.split('/shorts/')[1]
+          return videoId ? `https://www.youtube.com/embed/${videoId}` : null
+        }
+      }
+
+      if (host === 'youtu.be') {
+        const videoId = parsed.pathname.replace('/', '')
+        return videoId ? `https://www.youtube.com/embed/${videoId}` : null
+      }
+
+      if (host === 'vimeo.com') {
+        const videoId = parsed.pathname.replace('/', '')
+        return videoId ? `https://player.vimeo.com/video/${videoId}` : null
+      }
+    } catch (error) {
+      return null
+    }
+    return null
+  }
 
   const toggleFavorite = async () => {
     try {
@@ -194,6 +225,35 @@ const WorkoutDetailPage = () => {
                 </div>
               )}
             </div>
+            {workout.video_url && (
+              <div className="rounded-3xl bg-gray-900/80 border border-gray-700 p-8">
+                <h2 className="text-2xl font-black text-white mb-4">Video Tutorial</h2>
+                {getEmbedVideoUrl(workout.video_url) ? (
+                  <div className="aspect-video rounded-2xl overflow-hidden border border-gray-700 mb-4">
+                    <iframe
+                      title={`${workout.title} tutorial`}
+                      src={getEmbedVideoUrl(workout.video_url)}
+                      className="w-full h-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                    />
+                  </div>
+                ) : (
+                  <p className="text-gray-300 text-sm mb-4">
+                    This workout includes a guided training video. Open it to follow along with the trainer.
+                  </p>
+                )}
+                <a
+                  href={workout.video_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-primary inline-flex items-center gap-2"
+                >
+                  <FiPlayCircle />
+                  <span>Watch Full Tutorial</span>
+                </a>
+              </div>
+            )}
 
             <div className="rounded-3xl bg-gray-900/80 border border-gray-700 p-8">
               <h2 className="text-2xl font-black text-white mb-4">Exercises</h2>
@@ -213,6 +273,17 @@ const WorkoutDetailPage = () => {
                         </div>
                       </div>
                       <p className="text-gray-300 text-sm leading-relaxed">{exercise.instructions || exercise.description}</p>
+                      {exercise.video_url && (
+                        <a
+                          href={exercise.video_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 mt-3 text-orange-300 hover:text-orange-200 text-sm font-semibold"
+                        >
+                          <FiPlayCircle />
+                          <span>Watch exercise tutorial</span>
+                        </a>
+                      )}
                     </div>
                   ))}
                 </div>

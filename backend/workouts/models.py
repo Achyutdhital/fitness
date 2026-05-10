@@ -158,6 +158,58 @@ class Meal(models.Model):
         return f"{self.meal_plan.title} - Day {self.day} {self.meal_type}"
 
 
+class WorkoutProgram(models.Model):
+    """Overall training programs (e.g., 90-Day Transformation)"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255)
+    description = models.TextField()
+    thumbnail = models.ImageField(upload_to='program_thumbnails/', null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+class WorkoutPhase(models.Model):
+    """Stages within a program (e.g., Phase 1: Foundation)"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    program = models.ForeignKey(WorkoutProgram, on_delete=models.CASCADE, related_name='phases')
+    name = models.CharField(max_length=255)
+    order = models.PositiveIntegerField(default=1)
+    duration_weeks = models.PositiveIntegerField(default=4)
+    description = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['order']
+
+    def __str__(self):
+        return f"{self.program.name} - {self.name}"
+
+class ScheduledWorkout(models.Model):
+    """Link a workout to a specific day in a phase"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    phase = models.ForeignKey(WorkoutPhase, on_delete=models.CASCADE, related_name='scheduled_workouts')
+    workout = models.ForeignKey('Workout', on_delete=models.CASCADE)
+    day_number = models.PositiveIntegerField(help_text="Which day of the phase this workout occurs on (1-28 for a 4-week phase)")
+
+    class Meta:
+        ordering = ['day_number']
+        unique_together = ['phase', 'day_number']
+
+    def __str__(self):
+        return f"{self.phase.name} - Day {self.day_number}: {self.workout.title}"
+
+class UserProgram(models.Model):
+    """Track user's current program progress"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField('accounts.CustomUser', on_delete=models.CASCADE, related_name='current_program')
+    program = models.ForeignKey(WorkoutProgram, on_delete=models.SET_NULL, null=True)
+    start_date = models.DateField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.program.name if self.program else 'No Program'}"
+
 class UserWorkoutProgress(models.Model):
     """Track user progress on workouts"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

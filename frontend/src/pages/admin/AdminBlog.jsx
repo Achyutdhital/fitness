@@ -3,7 +3,7 @@ import { cmsAPI } from '../../services/api'
 import { AdminTable, AdminModal, AdminPageHeader, ConfirmDelete, Field, Input, Textarea, Select, Toggle, Badge } from './AdminComponents'
 
 const STATUS_OPTIONS = [{ value: 'draft', label: 'Draft' }, { value: 'published', label: 'Published' }, { value: 'archived', label: 'Archived' }]
-const emptyPost = { title: '', content: '', excerpt: '', featured_image_url: '', author: '', status: 'draft', featured: false, tags: '', category_id: '', meta_description: '' }
+const emptyPost = { title: '', content: '', excerpt: '', featured_image_url: '', author: '', status: 'draft', featured: false, tags: '', category_id: '', meta_title: '', meta_description: '', meta_keywords: '' }
 const emptyCat = { name: '', description: '', color: '#f97316' }
 
 const AdminBlog = () => {
@@ -94,7 +94,22 @@ const AdminBlog = () => {
       {modal && (
         <AdminModal title={modal === 'edit' ? 'Edit Post' : 'New Post'} onClose={() => setModal(null)} onSave={savePost} saving={saving}>
           <Field label="Title" required><Input {...f('title')} placeholder="Post title..." /></Field>
-          <div className="grid grid-cols-2 gap-4">
+          
+          <div className="bg-gray-900/50 p-4 rounded-2xl border border-gray-700 mb-4">
+            <h4 className="text-white font-bold text-xs uppercase tracking-widest mb-3 flex items-center space-x-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+              <span>SEO Meta Data</span>
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Field label="Meta Title"><Input {...f('meta_title')} placeholder="Browser tab title..." /></Field>
+              <Field label="Meta Keywords"><Input {...f('meta_keywords')} placeholder="keywords, separated, by, commas" /></Field>
+              <div className="md:col-span-2">
+                <Field label="Meta Description"><Textarea {...f('meta_description')} rows={2} placeholder="Search engine description (max 160 chars)..." /></Field>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Author"><Input {...f('author')} placeholder="Author name" /></Field>
             <Field label="Status"><Select {...f('status')} options={STATUS_OPTIONS} /></Field>
             <Field label="Category"><Select value={form.category_id || ''} onChange={e => setForm({ ...form, category_id: e.target.value })} options={catOptions} /></Field>
@@ -103,7 +118,6 @@ const AdminBlog = () => {
           <Field label="Featured Image URL"><Input {...f('featured_image_url')} placeholder="https://images.unsplash.com/..." /></Field>
           <Field label="Excerpt"><Textarea {...f('excerpt')} rows={2} placeholder="Short summary shown in lists..." /></Field>
           <Field label="Content" required><Textarea {...f('content')} rows={8} placeholder="Write your blog post content here..." /></Field>
-          <Field label="Meta Description"><Input {...f('meta_description')} placeholder="SEO description..." /></Field>
           <Toggle label="Featured post (shown on homepage)" checked={!!form.featured} onChange={v => setForm({ ...form, featured: v })} />
         </AdminModal>
       )}

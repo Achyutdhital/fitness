@@ -5,7 +5,7 @@ import {
   FiGrid, FiFileText, FiSettings, FiUsers, FiMessageSquare,
   FiImage, FiLayers, FiDollarSign, FiActivity, FiAward,
   FiMail, FiTag, FiChevronRight, FiMenu, FiX, FiShield,
-  FiZap, FiBarChart2
+  FiZap, FiBarChart2, FiCalendar, FiTarget
 } from 'react-icons/fi'
 
 import AdminOverview from './AdminOverview'
@@ -20,46 +20,9 @@ import AdminSettings from './AdminSettings'
 import AdminChallenges from './AdminChallenges'
 import AdminCoupons from './AdminCoupons'
 import AdminNewsletter from './AdminNewsletter'
-
-const navGroups = [
-  {
-    label: 'Overview',
-    items: [
-      { to: '/admin', label: 'Dashboard', icon: FiGrid, exact: true },
-    ]
-  },
-  {
-    label: 'Content',
-    items: [
-      { to: '/admin/workouts', label: 'Workouts', icon: FiActivity },
-      { to: '/admin/meal-plans', label: 'Meal Plans', icon: FiLayers },
-      { to: '/admin/blog', label: 'Blog Posts', icon: FiFileText },
-      { to: '/admin/pages', label: 'Pages', icon: FiImage },
-    ]
-  },
-  {
-    label: 'Business',
-    items: [
-      { to: '/admin/subscriptions', label: 'Subscriptions', icon: FiDollarSign },
-      { to: '/admin/coupons', label: 'Coupons', icon: FiTag },
-      { to: '/admin/challenges', label: 'Challenges', icon: FiAward },
-      { to: '/admin/newsletter', label: 'Newsletter', icon: FiMail },
-    ]
-  },
-  {
-    label: 'People',
-    items: [
-      { to: '/admin/users', label: 'Users', icon: FiUsers },
-      { to: '/admin/messages', label: 'Messages', icon: FiMessageSquare },
-    ]
-  },
-  {
-    label: 'System',
-    items: [
-      { to: '/admin/settings', label: 'Site Settings', icon: FiSettings },
-    ]
-  },
-]
+import AdminClients from './AdminClients'
+import AdminSchedule from './AdminSchedule'
+import AdminSEO from './AdminSEO'
 
 const AdminLayout = () => {
   const { user } = useAuth()
@@ -67,7 +30,65 @@ const AdminLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   if (!user) return <Navigate to="/login" replace />
-  if (!user.is_staff && !user.is_superuser) return <Navigate to="/dashboard" replace />
+  
+  // Check if user has any staff-like role
+  const allowedRoles = ['admin', 'coach', 'content_writer']
+  const hasAccess = user.is_superuser || allowedRoles.includes(user.role)
+  
+  if (!hasAccess) return <Navigate to="/dashboard" replace />
+
+  const getFilteredNav = () => {
+    const role = user.is_superuser ? 'superadmin' : user.role
+    
+    return [
+      {
+        label: 'Overview',
+        items: [
+          { to: '/admin', label: 'Dashboard', icon: FiGrid, exact: true },
+        ]
+      },
+      // COACH SPECIFIC
+      ...(role === 'coach' || role === 'superadmin' || role === 'admin' ? [{
+        label: 'Coaching',
+        items: [
+          { to: '/admin/clients', label: 'My Clients', icon: FiUsers },
+          { to: '/admin/schedule', label: 'Calendar', icon: FiCalendar },
+        ]
+      }] : []),
+      // CONTENT / SEO SPECIFIC
+      ...(role === 'content_writer' || role === 'superadmin' || role === 'admin' ? [{
+        label: 'Marketing & SEO',
+        items: [
+          { to: '/admin/blog', label: 'Blog Posts', icon: FiFileText },
+          { to: '/admin/pages', label: 'Pages & Content', icon: FiImage },
+          { to: '/admin/seo', label: 'Global SEO', icon: FiTarget },
+          { to: '/admin/newsletter', label: 'Newsletter', icon: FiMail },
+        ]
+      }] : []),
+      // BUSINESS / FULL ADMIN
+      ...(role === 'admin' || role === 'superadmin' ? [{
+        label: 'Business',
+        items: [
+          { to: '/admin/workouts', label: 'Manage Workouts', icon: FiActivity },
+          { to: '/admin/meal-plans', label: 'Meal Plans', icon: FiLayers },
+          { to: '/admin/subscriptions', label: 'Subscriptions', icon: FiDollarSign },
+          { to: '/admin/coupons', label: 'Coupons', icon: FiTag },
+          { to: '/admin/challenges', label: 'Challenges', icon: FiAward },
+        ]
+      }] : []),
+      // SYSTEM / SUPERUSER
+      ...(role === 'superadmin' || role === 'admin' ? [{
+        label: 'System',
+        items: [
+          { to: '/admin/users', label: 'User Directory', icon: FiUsers },
+          { to: '/admin/messages', label: 'Support Inbox', icon: FiMessageSquare },
+          { to: '/admin/settings', label: 'Site Settings', icon: FiSettings },
+        ]
+      }] : []),
+    ]
+  }
+
+  const navGroups = getFilteredNav()
 
   const isActive = (to, exact) => {
     if (exact) return location.pathname === to
@@ -207,6 +228,9 @@ const AdminLayout = () => {
             <Route path="challenges/*" element={<AdminChallenges />} />
             <Route path="coupons/*" element={<AdminCoupons />} />
             <Route path="newsletter/*" element={<AdminNewsletter />} />
+            <Route path="clients/*" element={<AdminClients />} />
+            <Route path="schedule/*" element={<AdminSchedule />} />
+            <Route path="seo/*" element={<AdminSEO />} />
           </Routes>
         </main>
       </div>

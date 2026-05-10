@@ -19,13 +19,23 @@ api.interceptors.request.use((config) => {
 })
 
 // Handle response errors
+// NOTE: We do NOT do window.location.href redirects here — that causes
+// a full page reload which re-triggers AuthContext.fetchUser → another 401
+// → another reload → infinite loop and browser crash.
+// Instead, we only clear tokens; AuthContext and ProtectedRoute handle
+// redirecting unauthenticated users via React Router (no reload).
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      // Only clear tokens; do NOT do a hard page redirect
+      const hadToken = localStorage.getItem('access_token')
       localStorage.removeItem('access_token')
       localStorage.removeItem('refresh_token')
-      window.location.href = '/login'
+      // Dispatch a custom event so AuthContext can react without a reload
+      if (hadToken) {
+        window.dispatchEvent(new Event('auth:logout'))
+      }
     }
     return Promise.reject(error)
   }
@@ -50,6 +60,7 @@ export const authAPI = {
 
 // Subscription APIs
 export const subscriptionAPI = {
+  getTiers: () => api.get('/subscriptions/tiers/'),
   getPlans: () => api.get('/subscriptions/plans/'),
   getPlanDetails: (id) => api.get(`/subscriptions/plans/${id}/`),
   createPlan: (data) => api.post('/subscriptions/plans/', data),
@@ -63,6 +74,7 @@ export const subscriptionAPI = {
 export const workoutAPI = {
   getWorkouts: (params) => api.get('/workouts/workouts/', { params }),
   getWorkoutDetails: (id) => api.get(`/workouts/workouts/${id}/`),
+  getTodayWorkout: () => api.get('/workouts/workouts/today/'),
   createWorkout: (data) => api.post('/workouts/workouts/', data),
   updateWorkout: (id, data) => api.patch(`/workouts/workouts/${id}/`, data),
   deleteWorkout: (id) => api.delete(`/workouts/workouts/${id}/`),
@@ -72,7 +84,7 @@ export const workoutAPI = {
   deleteCategory: (id) => api.delete(`/workouts/categories/${id}/`),
   getMyWorkouts: () => api.get('/workouts/workouts/my_workouts/'),
   getFeaturedWorkouts: () => api.get('/workouts/workouts/featured/'),
-  markWorkoutComplete: (id, data) => api.post(`/workouts/workouts/${id}/mark_complete/`, data),
+  markWorkoutComplete: (id, data) => api.post(`/workouts/workouts/${id}/mark_complete/`),
   getProgress: () => api.get('/workouts/progress/my_progress/'),
   getStats: () => api.get('/workouts/progress/stats/'),
   getMealPlans: (params) => api.get('/workouts/meal-plans/', { params }),
@@ -80,6 +92,8 @@ export const workoutAPI = {
   createMealPlan: (data) => api.post('/workouts/meal-plans/', data),
   updateMealPlan: (id, data) => api.patch(`/workouts/meal-plans/${id}/`, data),
   deleteMealPlan: (id) => api.delete(`/workouts/meal-plans/${id}/`),
+  getPrograms: () => api.get('/workouts/programs/'),
+  getProgramDetails: (id) => api.get(`/workouts/programs/${id}/`),
   getMyMealPlans: () => api.get('/workouts/meal-plans/my_plans/'),
 }
 
@@ -136,6 +150,17 @@ export const coreAPI = {
   // Support
   submitTicket: (data) => api.post('/core/support/submit/', data),
   getMyTickets: () => api.get('/core/support/my_tickets/'),
+
+  // Ads & Unlocks
+  logAdView: () => api.post('/core/ads/log_ad_view/'),
+  unlockItem: (data) => api.post('/core/ads/unlock_item/', data),
+
+  // Coach Management
+  getCoachClients: () => api.get('/core/coach/get_coach_clients/'),
+  customizeWorkout: (clientId, data) => api.post(`/core/coach/${clientId}/customize_workout/`, data),
+
+  // Reminders
+  checkReminders: () => api.get('/core/reminders/check_reminders/'),
 }
 
 // CMS APIs - Website Content
@@ -210,3 +235,10 @@ export const adminAPI = {
   updateUser: (id, data) => api.patch(`/auth/admin/users/${id}/`, data),
   deleteUser: (id) => api.delete(`/auth/admin/users/${id}/`),
 }
+
+// AI Coach API (tier-gated: Basic=general, Pro=personalised, Elite=full coaching)
+export const aiAPI = {
+  chat: (message) => api.post('/core/ai/chat/', { message }),
+  getHistory: () => api.get('/core/ai/history/'),
+}
+

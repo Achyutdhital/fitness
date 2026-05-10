@@ -1,9 +1,15 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .models import SubscriptionPlan, Feature
-from .serializers import SubscriptionPlanSerializer, SubscriptionPlanDetailSerializer, FeatureSerializer
+from .models import SubscriptionPlan, Feature, SubscriptionTier
+from .serializers import SubscriptionPlanSerializer, SubscriptionPlanDetailSerializer, FeatureSerializer, SubscriptionTierSerializer
+
+
+class SubscriptionTierViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = SubscriptionTier.objects.all().order_by('priority')
+    serializer_class = SubscriptionTierSerializer
+    permission_classes = [permissions.AllowAny]
 
 
 class SubscriptionPlanViewSet(viewsets.ModelViewSet):

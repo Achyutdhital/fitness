@@ -9,6 +9,7 @@ from .models import (
     DynamicPage, SocialMediaLinks, NewsletterSubscription,
     PageSection, SectionItem, ImageAsset
 )
+from fitness_project.utils.emails import send_newsletter_confirmation, send_contact_inquiry_receipt
 from .serializers import (
     WebsiteSettingsSerializer, BlogPostListSerializer, BlogPostDetailSerializer,
     BlogCategorySerializer, ContactMessageSerializer, ContactMessageAdminSerializer,
@@ -75,7 +76,10 @@ class BlogPostViewSet(viewsets.ModelViewSet):
         return BlogPostDetailSerializer
     
     def get_permissions(self):
-        if self.action in ['list', 'retrieve']:
+        # Public read actions — @action decorator permission_classes is ignored
+        # when get_permissions() is overridden, so we must list them explicitly.
+        public = ['list', 'retrieve', 'featured', 'latest', 'search', 'by_category', 'increment_views']
+        if self.action in public:
             return [permissions.AllowAny()]
         return [permissions.IsAdminUser()]
     
@@ -152,6 +156,10 @@ class ContactMessageViewSet(viewsets.ModelViewSet):
             return ContactMessage.objects.all()
         return ContactMessage.objects.none()
 
+    def perform_create(self, serializer):
+        msg = serializer.save()
+        send_contact_inquiry_receipt(msg.email, msg.name, msg.subject)
+
 
 class DynamicPageViewSet(viewsets.ModelViewSet):
     """Dynamic page management"""
@@ -165,7 +173,11 @@ class DynamicPageViewSet(viewsets.ModelViewSet):
         return DynamicPage.objects.filter(is_visible=True)
     
     def get_permissions(self):
-        if self.action in ['list', 'retrieve']:
+        # footer_pages and menu_pages must be explicitly listed here;
+        # their @action(permission_classes=[AllowAny()]) is ignored when
+        # get_permissions() is overridden.
+        public = ['list', 'retrieve', 'footer_pages', 'menu_pages']
+        if self.action in public:
             return [permissions.AllowAny()]
         return [permissions.IsAdminUser()]
     
@@ -220,6 +232,9 @@ class NewsletterSubscriptionViewSet(viewsets.ModelViewSet):
                     subscriber.unsubscribed_at = None
                     subscriber.save()
                 
+                if created:
+                    send_newsletter_confirmation(email, subscriber.name)
+                
                 message = 'Subscribed successfully' if created else 'Already subscribed'
                 return Response(
                     {'message': message},
@@ -244,7 +259,9 @@ class PageSectionViewSet(viewsets.ModelViewSet):
         return PageSection.objects.filter(page=page, is_visible=True).order_by('display_order')
     
     def get_permissions(self):
-        if self.action in ['list']:
+        # by_page must be listed explicitly — same DRF override issue.
+        public = ['list', 'by_page']
+        if self.action in public:
             return [permissions.AllowAny()]
         return [permissions.IsAdminUser()]
     
@@ -279,7 +296,9 @@ class ImageAssetViewSet(viewsets.ModelViewSet):
     serializer_class = ImageAssetSerializer
     
     def get_permissions(self):
-        if self.action in ['list']:
+        # by_category must be listed explicitly — same DRF override issue.
+        public = ['list', 'by_category']
+        if self.action in public:
             return [permissions.AllowAny()]
         return [permissions.IsAdminUser()]
     

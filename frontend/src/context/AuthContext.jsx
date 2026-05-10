@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useCallback } from 'react'
+import React, { createContext, useState, useEffect, useCallback, useRef } from 'react'
 import { authAPI } from '../services/api'
 
 export const AuthContext = createContext()
@@ -8,14 +8,18 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('access_token'))
   const [loading, setLoading] = useState(true)
   const [subscription, setSubscription] = useState(null)
+  const fetchingRef = useRef(false)
 
-  // Fetch user profile
+  // Fetch user profile — guarded against concurrent/re-entrant calls
   const fetchUser = useCallback(async () => {
-    if (token) {
+    if (fetchingRef.current) return
+    const currentToken = localStorage.getItem('access_token')
+    if (currentToken) {
+      fetchingRef.current = true
       try {
         const response = await authAPI.getProfile()
         setUser(response.data)
-        
+
         // Fetch subscription info
         try {
           const subResponse = await authAPI.getSubscription()
@@ -24,18 +28,35 @@ export const AuthProvider = ({ children }) => {
           setSubscription(null)
         }
       } catch (error) {
+        // 401 is already handled by the API interceptor (clears tokens, fires event)
+        // For other errors just log and clear state
         console.error('Failed to fetch user:', error)
-        localStorage.removeItem('access_token')
-        setToken(null)
         setUser(null)
+        setToken(null)
+      } finally {
+        fetchingRef.current = false
       }
     }
     setLoading(false)
-  }, [token])
+  }, []) // no dependency on token — reads directly from localStorage
 
+  // Run once on mount
   useEffect(() => {
     fetchUser()
   }, [fetchUser])
+
+  // Listen for the 'auth:logout' event dispatched by the API interceptor.
+  // This lets us clear React state without triggering a full page reload.
+  useEffect(() => {
+    const handleForceLogout = () => {
+      setToken(null)
+      setUser(null)
+      setSubscription(null)
+      setLoading(false)
+    }
+    window.addEventListener('auth:logout', handleForceLogout)
+    return () => window.removeEventListener('auth:logout', handleForceLogout)
+  }, [])
 
   const login = async (username, password) => {
     try {
@@ -102,18 +123,30 @@ export const AuthProvider = ({ children }) => {
 
   const isAuthenticated = Boolean(token && user)
 
+  // Superadmin/staff always see Elite tier across all UI (for testing all features)
+  const isSuperAdmin = user?.is_superuser || user?.is_staff
+  const effectiveSubscription = isSuperAdmin
+    ? {
+        status: 'active',
+        tier_details: { name: 'Elite', sessions_per_week: 3 },
+        plan: { billing_cycle: 'monthly', price: '99.99' },
+      }
+    : subscription
+
   const value = {
     user,
     token,
     loading,
-    subscription,
+    subscription: effectiveSubscription,
     isAuthenticated,
+    isSuperAdmin,
     login,
     register,
     logout,
     updateProfile,
     fetchUser,
   }
+
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

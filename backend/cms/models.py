@@ -31,6 +31,7 @@ class WebsiteSettings(models.Model):
     youtube_url = models.URLField(blank=True)
     
     # SEO
+    meta_title = models.CharField(max_length=200, blank=True)
     meta_keywords = models.CharField(max_length=500, blank=True)
     meta_description = models.CharField(max_length=500, blank=True)
     
@@ -113,6 +114,7 @@ class BlogPost(models.Model):
     views_count = models.IntegerField(default=0)
     
     # SEO
+    meta_title = models.CharField(max_length=300, blank=True)
     meta_keywords = models.CharField(max_length=500, blank=True)
     meta_description = models.CharField(max_length=500, blank=True)
     
@@ -186,6 +188,8 @@ class DynamicPage(models.Model):
     show_in_footer = models.BooleanField(default=False)
     show_in_menu = models.BooleanField(default=False)
     
+    # SEO
+    meta_title = models.CharField(max_length=200, blank=True)
     meta_description = models.CharField(max_length=500, blank=True)
     meta_keywords = models.CharField(max_length=500, blank=True)
     

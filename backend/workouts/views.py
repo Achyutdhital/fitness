@@ -4,10 +4,14 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db import models as db_models
-from .models import Workout, WorkoutCategory, MealPlan, UserWorkoutProgress
+from .models import (
+    Workout, WorkoutCategory, MealPlan, UserWorkoutProgress,
+    WorkoutProgram, WorkoutPhase, ScheduledWorkout, UserProgram
+)
 from .serializers import (
     WorkoutSerializer, WorkoutDetailSerializer, WorkoutCategorySerializer,
-    MealPlanSerializer, MealPlanDetailSerializer, UserWorkoutProgressSerializer
+    MealPlanSerializer, MealPlanDetailSerializer, UserWorkoutProgressSerializer,
+    WorkoutProgramSerializer, WorkoutPhaseSerializer
 )
 
 
@@ -94,6 +98,67 @@ class WorkoutViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def today(self, request):
+        """Get the automated workout for today based on user's program/phase"""
+        from django.utils import timezone
+        user = request.user
+        
+        try:
+            up = UserProgram.objects.get(user=user, is_active=True)
+            if not up.program:
+                raise UserProgram.DoesNotExist
+                
+            # Calculate days since start
+            delta = timezone.now().date() - up.start_date
+            days_elapsed = delta.days + 1 # Day 1 is the start date
+            
+            # Find the current phase
+            current_day_offset = 0
+            current_phase = None
+            for phase in up.program.phases.all().order_by('order'):
+                phase_days = phase.duration_weeks * 7
+                if days_elapsed <= (current_day_offset + phase_days):
+                    current_phase = phase
+                    break
+                current_day_offset += phase_days
+            
+            if not current_phase:
+                return Response({'message': 'Program completed! Check out new programs.', 'completed': True})
+                
+            # Day within the phase
+            day_in_phase = days_elapsed - current_day_offset
+            
+            # Find scheduled workout
+            scheduled = ScheduledWorkout.objects.filter(phase=current_phase, day_number=day_in_phase).first()
+            
+            if scheduled:
+                serializer = self.get_serializer(scheduled.workout)
+                return Response({
+                    'workout': serializer.data,
+                    'program_name': up.program.name,
+                    'phase_name': current_phase.name,
+                    'day_number': days_elapsed,
+                    'day_in_phase': day_in_phase
+                })
+            else:
+                return Response({'message': 'Rest Day', 'is_rest': True, 'day_number': days_elapsed})
+                
+        except UserProgram.DoesNotExist:
+            # Fallback to a featured workout if no program
+            workout = Workout.objects.filter(is_featured=True, is_active=True).first()
+            if not workout:
+                workout = Workout.objects.filter(is_active=True).first()
+            
+            if workout:
+                serializer = self.get_serializer(workout)
+                return Response({
+                    'workout': serializer.data,
+                    'message': 'Recommended Workout (Assign a program for daily automation)',
+                    'is_fallback': True
+                })
+            return Response({'message': 'No workouts available.'}, status=404)
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def featured(self, request):
         """Get featured workouts"""
         workouts = self.queryset.filter(is_featured=True)
@@ -143,6 +208,23 @@ class MealPlanViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(plans, many=True)
         return Response(serializer.data)
 
+
+class WorkoutProgramViewSet(viewsets.ModelViewSet):
+    """Training programs management"""
+    queryset = WorkoutProgram.objects.filter(is_active=True).prefetch_related('phases')
+    serializer_class = WorkoutProgramSerializer
+    permission_classes = [AllowAny]
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
+class WorkoutPhaseViewSet(viewsets.ModelViewSet):
+    """Program phases management"""
+    queryset = WorkoutPhase.objects.all().prefetch_related('scheduled_workouts__workout')
+    serializer_class = WorkoutPhaseSerializer
+    permission_classes = [AllowAny]
 
 class UserWorkoutProgressViewSet(viewsets.ViewSet):
     """User workout progress tracking"""

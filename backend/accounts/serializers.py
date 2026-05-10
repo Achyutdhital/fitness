@@ -68,9 +68,11 @@ class CustomUserSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name',
             'phone', 'phone_number',
+            'phone', 'phone_number',
             'profile_image', 'bio', 'age', 'gender',
             'fitness_goal', 'fitness_level',
-            'weight', 'height',
+            'weight', 'height', 'role', 'assigned_coach',
+            'last_ad_view',
             'is_verified', 'is_staff', 'is_superuser',
             'date_of_birth', 'created_at',
         ]
@@ -96,12 +98,19 @@ class UserProfileSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at']
 
 
+class TierSerializer(serializers.ModelSerializer):
+    class Meta:
+        from subscriptions.models import SubscriptionTier
+        model = SubscriptionTier
+        fields = ['id', 'name', 'description', 'features', 'sessions_per_week']
+
 class UserSubscriptionSerializer(serializers.ModelSerializer):
     subscription_plan = serializers.SerializerMethodField()
+    tier_details = TierSerializer(source='tier', read_only=True)
 
     class Meta:
         model = UserSubscription
-        fields = ['id', 'subscription_plan', 'status', 'start_date', 'end_date', 'created_at']
+        fields = ['id', 'subscription_plan', 'tier', 'tier_details', 'status', 'start_date', 'end_date', 'created_at']
         read_only_fields = ['id', 'created_at']
 
     def get_subscription_plan(self, obj):

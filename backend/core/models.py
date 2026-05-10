@@ -182,6 +182,66 @@ class ChallengeParticipation(models.Model):
         ordering = ['-joined_at']
 
 
+class AdViewLog(models.Model):
+    """Log to track ad views for the Free tier '1-ad-per-week' requirement"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey('accounts.CustomUser', on_delete=models.CASCADE, related_name='ad_logs')
+    viewed_at = models.DateTimeField(auto_now_add=True)
+    points_awarded = models.IntegerField(default=10)
+
+    class Meta:
+        ordering = ['-viewed_at']
+
+class ItemUnlock(models.Model):
+    """Tracks individual items unlocked with points (Basic tier only)"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey('accounts.CustomUser', on_delete=models.CASCADE, related_name='unlocks')
+    workout = models.ForeignKey('workouts.Workout', on_delete=models.CASCADE, null=True, blank=True)
+    meal_plan = models.ForeignKey('workouts.MealPlan', on_delete=models.CASCADE, null=True, blank=True)
+    unlocked_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    def is_active(self):
+        from django.utils import timezone
+        return timezone.now() < self.expires_at
+
+class CustomizedWorkout(models.Model):
+    """Cloned workout for specific client, modified by coach"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    client = models.ForeignKey('accounts.CustomUser', on_delete=models.CASCADE, related_name='custom_workouts')
+    coach = models.ForeignKey('accounts.CustomUser', on_delete=models.CASCADE, related_name='managed_workouts')
+    original_workout = models.ForeignKey('workouts.Workout', on_delete=models.SET_NULL, null=True)
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    data = models.JSONField(help_text="Customized structure/exercises")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+class CustomizedMealPlan(models.Model):
+    """Cloned meal plan for specific client, modified by coach"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    client = models.ForeignKey('accounts.CustomUser', on_delete=models.CASCADE, related_name='custom_meal_plans')
+    coach = models.ForeignKey('accounts.CustomUser', on_delete=models.CASCADE, related_name='managed_meals')
+    original_meal_plan = models.ForeignKey('workouts.MealPlan', on_delete=models.SET_NULL, null=True)
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    data = models.JSONField(help_text="Customized diet plan")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+class CoachSession(models.Model):
+    """Scheduled 1-on-1 sessions (Elite/Pro)"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    coach = models.ForeignKey('accounts.CustomUser', on_delete=models.CASCADE, related_name='sessions_led')
+    client = models.ForeignKey('accounts.CustomUser', on_delete=models.CASCADE, related_name='sessions_attended')
+    scheduled_at = models.DateTimeField()
+    duration_minutes = models.IntegerField(default=45)
+    status = models.CharField(
+        max_length=20, 
+        choices=[('scheduled', 'Scheduled'), ('completed', 'Completed'), ('canceled', 'Canceled')],
+        default='scheduled'
+    )
+    meeting_link = models.URLField(blank=True)
+    notes = models.TextField(blank=True)
+
 class Notification(models.Model):
     TYPES = [
         ('achievement', 'Achievement Unlocked'),
@@ -191,6 +251,8 @@ class Notification(models.Model):
         ('system', 'System'),
         ('streak', 'Streak'),
         ('points', 'Points Earned'),
+        ('session', 'Coaching Session'),
+        ('unlock_expiry', 'Unlock Expiring'),
     ]
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey('accounts.CustomUser', on_delete=models.CASCADE, related_name='notifications')
@@ -207,6 +269,7 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.user.username}: {self.title}"
+
 
 
 class Coupon(models.Model):
@@ -277,3 +340,31 @@ class SupportTicket(models.Model):
 
     def __str__(self):
         return f"[{self.status.upper()}] {self.subject}"
+
+class AIUsage(models.Model):
+    user = models.ForeignKey('accounts.CustomUser', on_delete=models.CASCADE, related_name='ai_usage')
+    date = models.DateField(auto_now_add=True)
+    count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        unique_together = ('user', 'date')
+        verbose_name_plural = "AI Usage Tracking"
+
+    def __str__(self):
+        return f"{self.user.username} - {self.date}: {self.count} msgs"
+
+class AIChatMessage(models.Model):
+    ROLE_CHOICES = (
+        ('user', 'User'),
+        ('model', 'Coach'),
+    )
+    user = models.ForeignKey('accounts.CustomUser', on_delete=models.CASCADE, related_name='ai_chat_history')
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES)
+    text = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['timestamp']
+
+    def __str__(self):
+        return f"{self.user.username} ({self.role}): {self.text[:30]}..."

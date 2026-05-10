@@ -48,6 +48,7 @@ const emptyPage = {
   is_visible: true,
   show_in_footer: false,
   show_in_menu: false,
+  meta_title: '',
   meta_description: '',
   meta_keywords: '',
 }
@@ -384,12 +385,21 @@ const AdminPages = () => {
           <Field label="Content" required>
             <Textarea value={form.content || ''} onChange={(e) => setForm({ ...form, content: e.target.value })} rows={8} placeholder="HTML or plain text content" />
           </Field>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 bg-gray-900/50 p-4 rounded-2xl border border-gray-700">
+            <h4 className="text-white font-bold text-xs uppercase tracking-widest flex items-center space-x-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+              <span>SEO Meta Data</span>
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Field label="Meta Title">
+                <Input value={form.meta_title || ''} onChange={(e) => setForm({ ...form, meta_title: e.target.value })} placeholder="Browser tab title..." />
+              </Field>
+              <Field label="Meta Keywords">
+                <Input value={form.meta_keywords || ''} onChange={(e) => setForm({ ...form, meta_keywords: e.target.value })} placeholder="comma, separated" />
+              </Field>
+            </div>
             <Field label="Meta Description">
-              <Input value={form.meta_description || ''} onChange={(e) => setForm({ ...form, meta_description: e.target.value })} />
-            </Field>
-            <Field label="Meta Keywords">
-              <Input value={form.meta_keywords || ''} onChange={(e) => setForm({ ...form, meta_keywords: e.target.value })} />
+              <Textarea value={form.meta_description || ''} onChange={(e) => setForm({ ...form, meta_description: e.target.value })} rows={2} placeholder="Search engine description (max 160 chars)..." />
             </Field>
           </div>
           <div className="grid grid-cols-3 gap-4 pt-2">

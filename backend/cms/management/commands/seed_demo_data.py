@@ -8,7 +8,7 @@ from cms.models import (
     SocialMediaLinks, NewsletterSubscription,
     PageSection, SectionItem, ImageAsset,
 )
-from subscriptions.models import SubscriptionPlan
+from subscriptions.models import SubscriptionTier, SubscriptionPlan
 
 
 class Command(BaseCommand):
@@ -51,6 +51,7 @@ class Command(BaseCommand):
         SocialMediaLinks.objects.all().delete()
         NewsletterSubscription.objects.all().delete()
         SubscriptionPlan.objects.all().delete()
+        SubscriptionTier.objects.all().delete()
         WebsiteSettings.objects.all().delete()
 
     def seed_website_settings(self):
@@ -205,64 +206,121 @@ class Command(BaseCommand):
         )
 
     def seed_subscription_plans(self):
-        plans = [
+        tiers = [
             {
-                'name': 'Basic',
-                'description': 'Great for beginners starting their fitness journey.',
-                'price': '9.99',
-                'currency': 'USD',
-                'billing_cycle': 'monthly',
-                'duration_days': 30,
-                'features': ['5 workouts/week', 'Community access', 'Progress tracking'],
-                'max_workouts_per_week': 5,
-                'include_meal_plans': False,
-                'include_personal_trainer': False,
-                'include_nutrition_consultation': False,
-                'include_community_access': True,
-                'is_active': True,
+                'name': 'free',
+                'description': 'For the curious beginner. Dashboard & tracking always yours. Preview Day 1 of a beginner program — but progression, full programs, and real structure require a subscription.',
+                'features': [
+                    '✅ Dashboard & progress tracking (always free)',
+                    '✅ Streak tracking & basic achievements',
+                    '✅ Day 1 sample of 1 beginner workout (permanent)',
+                    '✅ Earn 25 pts per ad — preview 1 session at 50 pts',
+                    '❌ No full programs or multi-week progressions',
+                    '❌ No meal plans',
+                    '❌ No progress analytics',
+                    '❌ No community or challenges',
+                ],
+                'sessions_per_week': 0,
+                'priority': 0,
+                'plans': []
+            },
+            {
+                'name': 'basic',
+                'description': 'For the self-motivated trainer who wants real structure. Full multi-week programs, complete meal plans, and progress analytics — no coach, no personalization, but everything you need to train independently.',
+                'features': [
+                    '✅ Everything in Free',
+                    '✅ Full multi-week workout programs (all weeks & days)',
+                    '✅ Exercise progressions, load increases & alternatives',
+                    '✅ Complete meal plan library with macro tracking',
+                    '✅ Detailed progress analytics & charts',
+                    '✅ Community access, challenges & leaderboard',
+                    '✅ No ads — ever',
+                    '❌ Generic programs (not built for your body or goals)',
+                    '❌ No coach feedback or form checks',
+                    '❌ No plan adjustments when you plateau',
+                ],
+                'sessions_per_week': 0,
                 'priority': 1,
+                'plans': [
+                    {'cycle': 'monthly', 'price': '9.99', 'days': 30},
+                    {'cycle': 'quarterly', 'price': '24.99', 'days': 90},
+                    {'cycle': 'yearly', 'price': '79.99', 'days': 365},
+                ]
             },
             {
-                'name': 'Pro',
-                'description': 'Best value for a 3-month commitment with meal plans and trainer support.',
-                'price': '44.99',
-                'currency': 'USD',
-                'billing_cycle': 'quarterly',
-                'duration_days': 90,
-                'features': ['Unlimited workouts', 'Meal plans', 'Priority support', 'Community access'],
-                'max_workouts_per_week': 999,
-                'include_meal_plans': True,
-                'include_personal_trainer': True,
-                'include_nutrition_consultation': False,
-                'include_community_access': True,
-                'is_active': True,
+                'name': 'pro',
+                'description': 'For the results-focused member ready for real coaching. Your coach builds a plan specifically for your body, goals, and limitations. 1 live session per week, form reviews, and bi-weekly plan adjustments.',
+                'features': [
+                    '✅ Everything in Basic',
+                    '✅ Coach-built custom workout plan (your goals, body, limits)',
+                    '✅ Coach-built custom meal & diet plan (your dietary needs)',
+                    '✅ 1 live video coaching session per week (30 min)',
+                    '✅ Form check: submit video → coach review within 48h',
+                    '✅ Plan adjusted every 2 weeks based on your progress',
+                    '✅ Coach messaging — replies within 24h (weekdays)',
+                    '❌ Shared coach (coach works with multiple clients)',
+                    '❌ Only 1 session/week — no mid-week support',
+                    '❌ No same-day responses or emergency adjustments',
+                ],
+                'sessions_per_week': 1,
                 'priority': 2,
+                'plans': [
+                    {'cycle': 'monthly', 'price': '29.99', 'days': 30},
+                    {'cycle': 'quarterly', 'price': '79.99', 'days': 90},
+                    {'cycle': 'yearly', 'price': '249.99', 'days': 365},
+                ]
             },
             {
-                'name': 'Elite',
-                'description': 'Annual plan with the deepest savings and full coaching experience.',
-                'price': '149.99',
-                'currency': 'USD',
-                'billing_cycle': 'yearly',
-                'duration_days': 365,
-                'features': ['Everything in Pro', '1-on-1 coaching', 'Nutrition consultation', 'Custom programs'],
-                'max_workouts_per_week': 999,
-                'include_meal_plans': True,
-                'include_personal_trainer': True,
-                'include_nutrition_consultation': True,
-                'include_community_access': True,
-                'is_active': True,
+                'name': 'elite',
+                'description': 'For the transformation-committed client. A dedicated coach who knows your name, your schedule, and your body. 3 sessions per week, daily messaging, rapid adjustments, and full accountability.',
+                'features': [
+                    '✅ Everything in Pro',
+                    '✅ DEDICATED personal coach (assigned, fewer clients)',
+                    '✅ 3 live coaching sessions per week (45 min each)',
+                    '✅ Daily form check & feedback (submit anytime)',
+                    '✅ Direct daily messaging — coach replies within 2h, 7 days',
+                    '✅ Emergency plan adjustment within 24h anytime',
+                    '✅ Full nutrition, recovery & sleep optimization',
+                    '✅ Monthly body composition review & goal reset',
+                    '✅ Priority access to new programs & features first',
+                ],
+                'sessions_per_week': 3,
                 'priority': 3,
+                'plans': [
+                    {'cycle': 'monthly', 'price': '99.99', 'days': 30},
+                    {'cycle': 'quarterly', 'price': '269.99', 'days': 90},
+                    {'cycle': 'yearly', 'price': '899.99', 'days': 365},
+                ]
             },
         ]
 
-        for plan in plans:
-            SubscriptionPlan.objects.update_or_create(
-                name=plan['name'],
-                defaults=plan,
+        for t_data in tiers:
+            tier, _ = SubscriptionTier.objects.update_or_create(
+                name=t_data['name'],
+                defaults={
+                    'description': t_data['description'],
+                    'features': t_data['features'],
+                    'sessions_per_week': t_data['sessions_per_week'],
+                    'priority': t_data['priority'],
+                }
             )
 
+            for p_data in t_data['plans']:
+                SubscriptionPlan.objects.update_or_create(
+                    tier=tier,
+                    billing_cycle=p_data['cycle'],
+                    defaults={
+                        'name': f"{tier.get_name_display()} {p_data['cycle'].capitalize()}",
+                        'price': p_data['price'],
+                        'duration_days': p_data['days'],
+                        'priority': tier.priority,
+                    }
+                )
+
+
+
     def seed_assets(self):
+
         assets = [
             ('Hero Background', 'Main hero image for homepage', 'hero', 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=1600&q=80', 'Fitness trainer in a gym', 1600, 900),
             ('Feature Workouts', 'Workout icon image', 'icon', 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=800&q=80', 'Kettlebell workout', 800, 600),

@@ -4,6 +4,7 @@ from .views import (
     FavoritesViewSet, ReviewViewSet, BodyMeasurementViewSet,
     GamificationViewSet, ChallengeViewSet, NotificationViewSet,
     CouponViewSet, ReferralViewSet, SupportTicketViewSet,
+    AdUnlockViewSet, CoachViewSet, ReminderViewSet, AICoachViewSet,
 )
 
 router = DefaultRouter()
@@ -16,5 +17,9 @@ router.register(r'notifications', NotificationViewSet, basename='notifications')
 router.register(r'coupons', CouponViewSet, basename='coupons')
 router.register(r'referrals', ReferralViewSet, basename='referrals')
 router.register(r'support', SupportTicketViewSet, basename='support')
+router.register(r'ads', AdUnlockViewSet, basename='ads')
+router.register(r'coach', CoachViewSet, basename='coach')
+router.register(r'reminders', ReminderViewSet, basename='reminders')
+router.register(r'ai', AICoachViewSet, basename='ai')
 
 urlpatterns = router.urls

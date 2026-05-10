@@ -1,5 +1,8 @@
 from rest_framework import serializers
-from .models import Workout, Exercise, WorkoutCategory, MealPlan, Meal, UserWorkoutProgress
+from .models import (
+    Workout, Exercise, WorkoutCategory, MealPlan, Meal, 
+    UserWorkoutProgress, WorkoutProgram, WorkoutPhase, ScheduledWorkout
+)
 
 
 class WorkoutCategorySerializer(serializers.ModelSerializer):
@@ -64,6 +67,24 @@ class MealPlanDetailSerializer(MealPlanSerializer):
     class Meta(MealPlanSerializer.Meta):
         fields = MealPlanSerializer.Meta.fields + ['required_subscription_plans', 'is_active', 'created_by', 'updated_at']
 
+
+class ScheduledWorkoutSerializer(serializers.ModelSerializer):
+    workout = WorkoutSerializer(read_only=True)
+    class Meta:
+        model = ScheduledWorkout
+        fields = ['id', 'day_number', 'workout']
+
+class WorkoutPhaseSerializer(serializers.ModelSerializer):
+    scheduled_workouts = ScheduledWorkoutSerializer(many=True, read_only=True)
+    class Meta:
+        model = WorkoutPhase
+        fields = ['id', 'name', 'order', 'duration_weeks', 'description', 'scheduled_workouts']
+
+class WorkoutProgramSerializer(serializers.ModelSerializer):
+    phases = WorkoutPhaseSerializer(many=True, read_only=True)
+    class Meta:
+        model = WorkoutProgram
+        fields = ['id', 'name', 'description', 'thumbnail', 'is_active', 'phases', 'created_at']
 
 class UserWorkoutProgressSerializer(serializers.ModelSerializer):
     workout_title = serializers.CharField(source='workout.title', read_only=True)

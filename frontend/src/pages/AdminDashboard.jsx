@@ -14,6 +14,7 @@ const AdminDashboard = () => {
   })
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
+  const [inquiries, setInquiries] = useState([])
 
   // Redirect non-staff users
   if (user && !user.is_staff && !user.is_superuser) {
@@ -29,6 +30,7 @@ const AdminDashboard = () => {
       const [adminRes, workoutsRes] = await Promise.allSettled([
         authAPI.getAdminStats(),
         workoutAPI.getWorkouts(),
+        cmsAPI.getContactMessages(),
       ])
 
       if (adminRes.status === 'fulfilled') {
@@ -44,12 +46,27 @@ const AdminDashboard = () => {
         const workouts = workoutsRes.value.data.results || workoutsRes.value.data || []
         setStats(prev => ({ ...prev, totalWorkouts: workouts.length }))
       }
+
+      // Stats from adminRes are already set. Other data is handled by specific effects if needed.
     } catch (error) {
       console.error('Failed to load admin data:', error)
     } finally {
       setLoading(false)
     }
   }
+
+  // Refined data loading to handle the 3rd promise properly
+  useEffect(() => {
+    const fetchInquiries = async () => {
+      try {
+        const res = await cmsAPI.getContactMessages()
+        setInquiries(res.data.results || res.data || [])
+      } catch (err) {
+        console.error("Failed to load inquiries", err)
+      }
+    }
+    if (activeTab === 'operations') fetchInquiries()
+  }, [activeTab])
 
   const adminCards = [
     { label: 'Total Revenue', value: `$${stats.totalRevenue}`, icon: FiDollarSign, color: 'from-green-500 to-teal-500', change: '+12% this month' },
@@ -100,46 +117,127 @@ const AdminDashboard = () => {
           </a>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {adminCards.map((card, i) => (
-            <div key={i} className="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-700">
-              <div className="flex items-center justify-between mb-4">
-                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${card.color} flex items-center justify-center`}>
-                  <card.icon className="text-white" size={24} />
-                </div>
-                <span className="text-green-400 text-xs bg-green-500/10 px-2 py-1 rounded-full">{card.change}</span>
-              </div>
-              <p className="text-4xl font-black text-white mb-1">{card.value}</p>
-              <p className="text-gray-400 text-sm">{card.label}</p>
-            </div>
+        {/* Main Content Tabs */}
+        <div className="flex space-x-1 bg-gray-800/50 p-1 rounded-2xl w-fit mb-8 border border-gray-700">
+          {['overview', 'operations', 'revenue'].map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
+            >
+              {tab}
+            </button>
           ))}
         </div>
 
-        {/* Admin Quick Links */}
-        <div className="mb-8">
-          <h2 className="text-white font-bold text-2xl mb-6">Quick Management</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {adminLinks.map((link, i) => (
-              <a
-                key={i}
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group bg-gray-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-700 hover:border-orange-500/50 transition-all duration-300 hover:-translate-y-1"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${link.color} flex items-center justify-center`}>
-                    <link.icon className="text-white" size={24} />
+        {activeTab === 'overview' && (
+          <>
+            {/* Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+              {adminCards.map((card, i) => (
+                <div key={i} className="bg-gray-800/50 backdrop-blur-sm rounded-3xl p-6 border border-gray-700 hover:border-orange-500/30 transition-all group">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${card.color} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
+                      <card.icon className="text-white" size={24} />
+                    </div>
+                    <span className="text-green-400 text-[10px] font-black uppercase tracking-widest bg-green-500/10 px-2 py-1 rounded-lg">{card.change}</span>
                   </div>
-                  <FiArrowRight className="text-gray-600 group-hover:text-orange-400 transition-colors" size={20} />
+                  <p className="text-4xl font-black text-white mb-1">{card.value}</p>
+                  <p className="text-gray-500 text-xs font-bold uppercase tracking-widest">{card.label}</p>
                 </div>
-                <h3 className="text-white font-bold text-lg mb-1 group-hover:text-orange-400 transition-colors">{link.label}</h3>
-                <p className="text-gray-400 text-sm">{link.desc}</p>
-              </a>
-            ))}
+              ))}
+            </div>
+
+            {/* Quick Links */}
+            <h2 className="text-white font-black text-2xl mb-8 flex items-center space-x-3">
+              <FiList className="text-orange-500" />
+              <span>Platform Control</span>
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+              {adminLinks.map((link, i) => (
+                <a
+                  key={i}
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group bg-gray-800/50 backdrop-blur-sm rounded-[2.5rem] p-8 border border-gray-700 hover:border-orange-500/50 transition-all duration-500"
+                >
+                  <div className="flex items-center justify-between mb-6">
+                    <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${link.color} flex items-center justify-center shadow-lg group-hover:rotate-6 transition-transform`}>
+                      <link.icon className="text-white" size={28} />
+                    </div>
+                    <FiArrowRight className="text-gray-600 group-hover:text-orange-400 transition-colors" size={24} />
+                  </div>
+                  <h3 className="text-white font-black text-xl mb-2 group-hover:text-orange-400 transition-colors">{link.label}</h3>
+                  <p className="text-gray-500 text-sm leading-relaxed">{link.desc}</p>
+                </a>
+              ))}
+            </div>
+          </>
+        )}
+
+        {activeTab === 'operations' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+            <div className="bg-gray-800/50 rounded-[2.5rem] p-8 border border-gray-700">
+               <h3 className="text-white font-black text-xl mb-6">Live Coaching Sessions</h3>
+               <div className="space-y-4">
+                  <div className="p-12 text-center border-2 border-dashed border-gray-700 rounded-3xl">
+                     <FiActivity className="text-gray-700 mx-auto mb-4" size={48} />
+                     <p className="text-gray-500 font-bold uppercase tracking-widest text-xs">No Active Streams</p>
+                  </div>
+               </div>
+            </div>
+            <div className="bg-gray-800/50 rounded-[2.5rem] p-8 border border-gray-700">
+               <h3 className="text-white font-black text-xl mb-6">Active Program Stages</h3>
+               <div className="space-y-6">
+                  {['Foundation (Week 1-4)', 'Power (Week 5-8)', 'Elite (Week 9-12)'].map((stage, i) => (
+                    <div key={stage} className="space-y-2">
+                       <div className="flex justify-between text-xs font-black uppercase tracking-widest">
+                          <span className="text-gray-400">{stage}</span>
+                          <span className="text-orange-500">{[45, 28, 12][i]} Users</span>
+                       </div>
+                       <div className="h-2 bg-gray-900 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-gradient-to-r from-orange-500 to-pink-500" 
+                            style={{ width: `${[70, 45, 20][i]}%` }}
+                          />
+                       </div>
+                    </div>
+                  ))}
+               </div>
+            </div>
+            <div className="bg-gray-800/50 rounded-[2.5rem] p-8 border border-gray-700 lg:col-span-2">
+               <h3 className="text-white font-black text-xl mb-6">Client Inquiries</h3>
+               <div className="space-y-4">
+                  {inquiries.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {inquiries.slice(0, 6).map((inq) => (
+                        <div key={inq.id} className="bg-gray-900/50 p-6 rounded-3xl border border-gray-700 hover:border-orange-500/30 transition-all">
+                           <div className="flex justify-between items-start mb-3">
+                              <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${inq.status === 'new' ? 'bg-orange-500 text-white' : 'bg-gray-700 text-gray-400'}`}>
+                                {inq.status}
+                              </span>
+                              <span className="text-gray-600 text-[10px]">{new Date(inq.created_at).toLocaleDateString()}</span>
+                           </div>
+                           <h4 className="text-white font-bold mb-1">{inq.subject}</h4>
+                           <p className="text-gray-500 text-xs mb-4 line-clamp-2">{inq.message}</p>
+                           <div className="flex items-center justify-between pt-4 border-t border-gray-800">
+                              <span className="text-[10px] text-gray-400 font-bold">{inq.name}</span>
+                              <a href={`mailto:${inq.email}`} className="text-orange-500 text-[10px] font-black uppercase tracking-widest hover:underline">Reply →</a>
+                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-12 text-center border-2 border-dashed border-gray-700 rounded-3xl">
+                       <FiList className="text-gray-700 mx-auto mb-4" size={48} />
+                       <p className="text-gray-500 font-bold uppercase tracking-widest text-xs">No pending inquiries</p>
+                    </div>
+                  )}
+               </div>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Info Banner */}
         <div className="bg-gradient-to-r from-orange-500/20 to-pink-500/20 border border-orange-500/30 rounded-2xl p-6">

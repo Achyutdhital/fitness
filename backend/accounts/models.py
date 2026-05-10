@@ -28,6 +28,21 @@ class CustomUser(AbstractUser):
     )
     weight = models.FloatField(null=True, blank=True, help_text="Weight in kg")
     height = models.FloatField(null=True, blank=True, help_text="Height in cm")
+    ROLE_CHOICES = [
+        ('member', 'Member'),
+        ('coach', 'Coach'),
+        ('admin', 'Admin'),
+        ('content_writer', 'Content Writer'),
+    ]
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='member')
+    assigned_coach = models.ForeignKey(
+        'self', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='clients'
+    )
+    last_ad_view = models.DateTimeField(null=True, blank=True)
     is_verified = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -43,7 +58,8 @@ class UserSubscription(models.Model):
     """Track user subscriptions"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='subscription')
-    subscription_plan = models.ForeignKey('subscriptions.SubscriptionPlan', on_delete=models.SET_NULL, null=True, related_name='users')
+    subscription_plan = models.ForeignKey('subscriptions.SubscriptionPlan', on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
+    tier = models.ForeignKey('subscriptions.SubscriptionTier', on_delete=models.SET_NULL, null=True, blank=True, related_name='user_subscriptions')
     stripe_subscription_id = models.CharField(max_length=255, unique=True, null=True, blank=True)
     stripe_customer_id = models.CharField(max_length=255, unique=True, null=True, blank=True)
     status = models.CharField(

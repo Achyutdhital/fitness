@@ -158,3 +158,11 @@ PASSWORD_RESET_TIMEOUT = 3600  # 1 hour
 
 # Frontend URL (for password reset links)
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
+
+# AI Coach — Multi-Provider API Keys
+# You can provide multiple keys separated by commas (e.g., key1,key2)
+GEMINI_API_KEY = config('GEMINI_API_KEY', default='')
+GROQ_API_KEY = config('GROQ_API_KEY', default='')
+OPENAI_API_KEY = config('OPENAI_API_KEY', default='')
+CLAUDE_API_KEY = config('CLAUDE_API_KEY', default='')
+

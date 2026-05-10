@@ -113,6 +113,38 @@ class UserViewSet(viewsets.ViewSet):
         from workouts.serializers import UserWorkoutProgressSerializer
         recent_data = UserWorkoutProgressSerializer(recent, many=True).data
 
+        # Calculate weekly activity history (Last 7 days)
+        from datetime import timedelta
+        end_date = timezone.now()
+        start_date = end_date - timedelta(days=6)
+        
+        # Group calories by day
+        history_qs = UserWorkoutProgress.objects.filter(
+            user=user, 
+            completed=True,
+            created_at__date__gte=start_date.date(),
+            created_at__date__lte=end_date.date()
+        ).values('created_at__date').annotate(calories=Sum('calories_burnt'))
+        
+        history_map = {h['created_at__date']: h['calories'] for h in history_qs}
+        
+        weekly_activity = []
+        for i in range(7):
+            d = start_date + timedelta(days=i)
+            weekly_activity.append({
+                'day': d.strftime('%a'), # Mon, Tue...
+                'calories': history_map.get(d.date(), 0),
+                'done': d.date() in history_map
+            })
+
+        # Get measurement history for weight chart
+        from core.models import BodyMeasurement
+        m_history = BodyMeasurement.objects.filter(user=user).order_by('date')[:30]
+        measurement_data = [
+            {'date': m.date.strftime('%b %d'), 'weight': m.weight} 
+            for m in m_history if m.weight
+        ]
+
         return Response({
             'completed_workouts': completed,
             'total_calories_burnt': calories,
@@ -125,6 +157,8 @@ class UserViewSet(viewsets.ViewSet):
             'achievements_count': achievements_count,
             'unread_notifications': unread_notifs,
             'recent_workouts': recent_data,
+            'weekly_activity': weekly_activity,
+            'measurement_history': measurement_data,
         })
 
 

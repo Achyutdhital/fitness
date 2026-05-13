@@ -49,13 +49,13 @@ export default function BlogDetailPage() {
 
   if (error || !post) {
     return (
-      <div className="min-h-screen bg-gray-50 py-12">
+      <div className="min-h-screen bg-[#0f172a] py-12">
         <div className="max-w-3xl mx-auto px-4">
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-8">
+          <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-6 py-4 rounded-2xl mb-8 font-medium">
             {error || 'Blog post not found'}
           </div>
-          <Link to="/blog" className="text-blue-600 hover:text-blue-800 font-semibold">
-            ← Back to Blog
+          <Link to="/blog" className="text-orange-500 hover:text-orange-400 font-bold uppercase tracking-widest text-xs flex items-center gap-2">
+            ← Back to Archive
           </Link>
         </div>
       </div>

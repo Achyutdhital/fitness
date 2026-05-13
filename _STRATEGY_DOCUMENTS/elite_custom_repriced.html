@@ -1,0 +1,220 @@
+
+<style>
+  .wrap{padding:1rem 0}
+  .s{font-size:11px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.06em;margin:1.4rem 0 .5rem}
+  .card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:1.1rem 1.25rem;margin-bottom:10px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:.5rem 0}
+  .box{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.8rem 1rem;font-size:12px;color:var(--color-text-secondary);line-height:1.6}
+  .box strong{display:block;font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:3px}
+  .pb{background:var(--color-background-secondary);border-radius:var(--border-radius-lg);padding:1.1rem 1.25rem;margin-bottom:10px}
+  .pr{display:grid;grid-template-columns:1fr auto;gap:5px 16px;align-items:center;font-size:13px}
+  .pr .l{color:var(--color-text-secondary)}
+  .pr .a{text-align:right;font-weight:500;color:var(--color-text-primary)}
+  .pr .dv{grid-column:1/-1;border-top:0.5px solid var(--color-border-tertiary);margin:5px 0}
+  .big{font-size:24px;font-weight:500;color:var(--color-text-primary);margin-bottom:8px}
+  .pill{display:inline-flex;align-items:center;gap:5px;border-radius:20px;padding:4px 12px;font-size:12px;margin:4px 4px 0 0}
+  .pg{background:#E1F5EE;color:#085041}
+  .pp{background:#EEEDFE;color:#3C3489}
+  .pb2{background:#B5D4F4;color:#0C447C}
+  .fr{display:flex;align-items:flex-start;gap:7px;font-size:12px;color:var(--color-text-secondary);margin:5px 0;line-height:1.35}
+  .fr i{font-size:14px;flex-shrink:0;margin-top:1px}
+  .yes{color:#1D9E75}.no{color:#B4B2A9}.warn{color:#BA7517}
+  .seg{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+  .seg button{background:transparent;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:5px 12px;font-size:12px;color:var(--color-text-secondary);cursor:pointer}
+  .seg button.active{background:var(--color-background-info);border-color:var(--color-border-info);color:var(--color-text-info);font-weight:500}
+  .lbl{font-size:12px;color:var(--color-text-secondary);margin-bottom:5px;margin-top:10px}
+  .tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:8px}
+  .tc{border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:.65rem .85rem;cursor:pointer}
+  .tc.sel{border:2px solid #7F77DD}
+  .tn{font-size:13px;font-weight:500;color:var(--color-text-primary)}
+  .ts{font-size:11px;color:var(--color-text-secondary);margin:2px 0}
+  .tr2{font-size:12px;color:#534AB7;font-weight:500}
+  .ask-btn{background:transparent;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:8px 14px;font-size:13px;color:var(--color-text-primary);cursor:pointer;margin-top:1rem;width:100%}
+  .ask-btn:hover{background:var(--color-background-secondary)}
+  .alert{background:#FAEEDA;border-radius:var(--border-radius-md);padding:7px 10px;font-size:12px;color:#633806;margin:.5rem 0}
+  .good{background:#E1F5EE;border-radius:var(--border-radius-md);padding:7px 10px;font-size:12px;color:#085041;margin:.5rem 0}
+</style>
+
+<div class="wrap">
+<h2 class="sr-only">Elite and Custom Coach repriced with correct trainer pay and platform margin</h2>
+
+<p style="font-size:13px;color:var(--color-text-secondary);margin:0 0 .75rem">Fixing Elite pricing so trainer pay, AI/infra costs, and platform margin all fit cleanly.</p>
+
+<div class="card">
+  <p class="s" style="margin-top:0">Why $59.99 Elite doesn't work</p>
+  <div class="row2">
+    <div class="box">
+      <strong>Old $59.99 breakdown</strong>
+      Trainer: 1 hr session pay ~$25–35 · AI + infra: ~$8 · Total cost: ~$43 · Platform left: ~$17 · That's only 28% margin — and barely covers support, payment fees, video infra
+    </div>
+    <div class="box">
+      <strong>The fix</strong>
+      Price Elite so that after trainer session pay + AI + infra, platform keeps a healthy ~30–35% margin. 2 sessions of 30 min = 1 hour trainer time. Trainer hourly rate varies by tier. Price must reflect that fully.
+    </div>
+  </div>
+
+  <p class="s">Elite chat access rule</p>
+  <div class="row2">
+    <div class="box">
+      <strong>Not unlimited chat</strong>
+      Trainer gets overwhelmed, burns out, quality drops. Unlimited chat is unsustainable at any price point unless you charge separately.
+    </div>
+    <div class="box">
+      <strong>Fixed message quota</strong>
+      Elite gets 10 trainer messages/week (questions, check-ins). Trainer must respond within 48 hrs. Extra messages = locked until next week. Clean, fair, manageable.
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <p class="s" style="margin-top:0">Elite Coach — repriced correctly</p>
+  <div class="lbl">Trainer tier for Elite plan</div>
+  <div class="tgrid" id="elite-tgrid">
+    <div class="tc sel" onclick="pickElite(this,30,40,'Standard')">
+      <div class="tn">Standard</div>
+      <div class="ts">General fitness</div>
+      <div class="tr2">$30/hr trainer pay</div>
+    </div>
+    <div class="tc" onclick="pickElite(this,45,60,'Certified Pro')">
+      <div class="tn">Certified Pro</div>
+      <div class="ts">Strength, recomp</div>
+      <div class="tr2">$45/hr trainer pay</div>
+    </div>
+    <div class="tc" onclick="pickElite(this,65,90,'Specialist')">
+      <div class="tn">Specialist</div>
+      <div class="ts">Medical, rehab</div>
+      <div class="tr2">$65/hr trainer pay</div>
+    </div>
+  </div>
+  <div id="elite-result" class="pb">
+    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:2px" id="elite-label">Elite Coach — Standard trainer</div>
+    <div class="big" id="elite-price">$0</div>
+    <div class="pr" id="elite-rows"></div>
+    <div style="margin-top:8px;display:flex;flex-wrap:wrap">
+      <div class="pill pg" id="elite-margin-pill"><i class="ti ti-trending-up" aria-hidden="true" style="font-size:13px"></i><span id="elite-margin-txt">Platform: $0/mo</span></div>
+      <div class="pill pp" id="elite-trainer-pill"><i class="ti ti-user" aria-hidden="true" style="font-size:13px"></i><span id="elite-trainer-txt">Trainer: $0/mo</span></div>
+    </div>
+  </div>
+  <div class="good"><i class="ti ti-message-circle" aria-hidden="true"></i> Elite includes: 10 trainer messages/week (48hr response), 2 × 30-min video sessions/month via in-platform video call</div>
+</div>
+
+<div class="card">
+  <p class="s" style="margin-top:0">Custom Coach — Elite base + session add-on</p>
+  <p style="font-size:12px;color:var(--color-text-secondary);margin:0 0 10px">User pays the correct Elite price above, then adds extra sessions on top. Platform takes 20% of session add-on revenue.</p>
+
+  <div class="lbl">Extra sessions per week (on top of Elite's 2/mo)</div>
+  <div class="seg" id="days-seg">
+    <button onclick="setDays(1)" class="active">1×</button>
+    <button onclick="setDays(2)">2×</button>
+    <button onclick="setDays(3)">3×</button>
+    <button onclick="setDays(4)">4×</button>
+    <button onclick="setDays(5)">5×</button>
+    <button onclick="setDays(6)">6×</button>
+    <button onclick="setDays(7)">Daily</button>
+  </div>
+
+  <div class="lbl">Session duration</div>
+  <div class="seg" id="dur-seg">
+    <button onclick="setDur(20)">20 min</button>
+    <button onclick="setDur(30)" class="active">30 min</button>
+    <button onclick="setDur(45)">45 min</button>
+    <button onclick="setDur(60)">60 min</button>
+  </div>
+
+  <div class="lbl">Trainer tier for extra sessions</div>
+  <div class="tgrid" id="custom-tgrid">
+    <div class="tc sel" onclick="pickCustom(this,30,'Standard')">
+      <div class="tn">Standard</div><div class="ts">General fitness</div><div class="tr2">$30/hr</div>
+    </div>
+    <div class="tc" onclick="pickCustom(this,45,'Certified Pro')">
+      <div class="tn">Certified Pro</div><div class="ts">Strength, recomp</div><div class="tr2">$45/hr</div>
+    </div>
+    <div class="tc" onclick="pickCustom(this,65,'Specialist')">
+      <div class="tn">Specialist</div><div class="ts">Medical, rehab</div><div class="tr2">$65/hr</div>
+    </div>
+  </div>
+
+  <div id="custom-result" class="pb">
+    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:2px" id="custom-label">Custom add-on total</div>
+    <div class="big" id="custom-total">$0</div>
+    <div class="pr" id="custom-rows"></div>
+    <div style="margin-top:8px;display:flex;flex-wrap:wrap">
+      <div class="pill pg"><i class="ti ti-trending-up" aria-hidden="true" style="font-size:13px"></i><span id="custom-plat-txt">Platform add-on profit: $0/mo</span></div>
+      <div class="pill pp"><i class="ti ti-user" aria-hidden="true" style="font-size:13px"></i><span id="custom-trainer-txt">Trainer earns: $0/mo</span></div>
+      <div class="pill pb2"><i class="ti ti-receipt" aria-hidden="true" style="font-size:13px"></i><span id="custom-grand-txt">Grand total: $0/mo</span></div>
+    </div>
+  </div>
+</div>
+
+<button class="ask-btn" onclick="sendPrompt('Elite and Custom plans are finalized. Now lets design the full platform UI ↗')">Plans finalized — design the platform ↗</button>
+</div>
+
+<script>
+  const AI_INFRA=8, PLAT_MARGIN=0.35;
+  let eliteTrainerHr=30, eliteTrainerName='Standard', elitePrice=0;
+  let cDays=1, cDur=30, cTrainerHr=30, cTrainerName='Standard';
+
+  function pickElite(el,trainerHr,unused,name){
+    eliteTrainerHr=trainerHr; eliteTrainerName=name;
+    document.querySelectorAll('#elite-tgrid .tc').forEach(c=>c.classList.remove('sel'));
+    el.classList.add('sel');
+    calcElite(); calcCustom();
+  }
+  function pickCustom(el,hr,name){
+    cTrainerHr=hr; cTrainerName=name;
+    document.querySelectorAll('#custom-tgrid .tc').forEach(c=>c.classList.remove('sel'));
+    el.classList.add('sel');
+    calcCustom();
+  }
+  function setDays(d){cDays=d;document.querySelectorAll('#days-seg button').forEach((b,i)=>b.classList.toggle('active',i===d-1));calcCustom();}
+  function setDur(d){cDur=d;document.querySelectorAll('#dur-seg button').forEach(b=>b.classList.toggle('active',b.textContent.trim()===d+' min'));calcCustom();}
+
+  function calcElite(){
+    const sessHrs=1;
+    const trainerPay=eliteTrainerHr*sessHrs;
+    const totalCost=trainerPay+AI_INFRA;
+    const price=Math.ceil(totalCost/(1-PLAT_MARGIN));
+    elitePrice=price;
+    const platMargin=price-totalCost;
+
+    document.getElementById('elite-label').textContent='Elite Coach — '+eliteTrainerName+' trainer';
+    document.getElementById('elite-price').textContent='$'+price+'/mo';
+    document.getElementById('elite-rows').innerHTML=`
+      <span class="l">2 sessions × 30 min = 1 hr trainer pay</span><span class="a">$${trainerPay}/mo</span>
+      <span class="l">AI + ML + infra + video</span><span class="a">$${AI_INFRA}/mo</span>
+      <div class="dv"></div>
+      <span class="l">Total cost</span><span class="a">$${totalCost}/mo</span>
+      <span class="l">Platform margin (35%)</span><span class="a" style="color:#1D9E75">$${Math.round(platMargin)}/mo</span>
+      <span class="l" style="font-weight:500;color:var(--color-text-primary)">User pays</span><span class="a" style="font-weight:500">$${price}/mo</span>
+    `;
+    document.getElementById('elite-margin-txt').textContent='Platform: $'+Math.round(platMargin)+'/mo';
+    document.getElementById('elite-trainer-txt').textContent='Trainer: $'+trainerPay+'/mo';
+  }
+
+  function calcCustom(){
+    const sessPerMo=Math.round(cDays*4.33);
+    const sessHrs=cDur/60;
+    const trainerPayPerSess=cTrainerHr*sessHrs;
+    const totalTrainerPay=Math.round(trainerPayPerSess*sessPerMo*100)/100;
+    const sessionRevMo=Math.round(totalTrainerPay/0.80*100)/100;
+    const platCut=Math.round(sessionRevMo*0.20*100)/100;
+    const grandTotal=Math.round((elitePrice+sessionRevMo)*100)/100;
+
+    document.getElementById('custom-label').textContent='Custom add-on: '+cDays+'×/wk, '+cDur+' min, '+cTrainerName;
+    document.getElementById('custom-total').textContent='$'+sessionRevMo.toFixed(2)+'/mo add-on';
+    document.getElementById('custom-rows').innerHTML=`
+      <span class="l">Sessions/month</span><span class="a">${sessPerMo} × ${cDur} min</span>
+      <span class="l">Trainer pay (80% of session revenue)</span><span class="a">$${totalTrainerPay.toFixed(2)}/mo</span>
+      <span class="l">Platform 20% of session revenue</span><span class="a" style="color:#1D9E75">$${platCut.toFixed(2)}/mo</span>
+      <div class="dv"></div>
+      <span class="l">Elite base</span><span class="a">$${elitePrice}/mo</span>
+      <span class="l">Session add-on</span><span class="a">$${sessionRevMo.toFixed(2)}/mo</span>
+      <span class="l" style="font-weight:500;color:var(--color-text-primary)">Grand total user pays</span><span class="a" style="font-weight:500">$${grandTotal.toFixed(2)}/mo</span>
+    `;
+    document.getElementById('custom-plat-txt').textContent='Platform add-on profit: $'+platCut.toFixed(2)+'/mo';
+    document.getElementById('custom-trainer-txt').textContent='Trainer earns: $'+totalTrainerPay.toFixed(2)+'/mo';
+    document.getElementById('custom-grand-txt').textContent='Grand total: $'+grandTotal.toFixed(2)+'/mo';
+  }
+
+  calcElite(); calcCustom();
+</script>

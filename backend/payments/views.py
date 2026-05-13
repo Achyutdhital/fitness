@@ -14,7 +14,7 @@ from .models import Payment, Invoice, Refund
 from .serializers import PaymentSerializer, InvoiceSerializer, RefundSerializer
 from accounts.models import UserSubscription
 from subscriptions.models import SubscriptionPlan
-from core.models import Coupon
+from core.models import Coupon, CoachPayout
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -22,6 +22,40 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 class PaymentViewSet(viewsets.ViewSet):
     """Handle payments and subscriptions"""
     permission_classes = [IsAuthenticated]
+
+    def _get_custom_coach_base_plan(self, base_plan_id=None):
+        queryset = SubscriptionPlan.objects.filter(is_active=True, tier__name='elite')
+        if base_plan_id:
+            plan = queryset.filter(id=base_plan_id).first()
+            if plan:
+                return plan
+        return queryset.order_by('price').first()
+
+    def _calculate_custom_coach_amount(self, base_price, custom_package):
+        sessions_per_week = Decimal(str(custom_package.get('sessions_per_week') or 0))
+        session_duration_minutes = Decimal(str(custom_package.get('session_duration_minutes') or 0))
+        hourly_rate = Decimal(str(custom_package.get('hourly_rate') or 0))
+        weekly_hours = (sessions_per_week * session_duration_minutes) / Decimal('60')
+        weekly_addon = (weekly_hours * hourly_rate).quantize(Decimal('0.01'))
+        monthly_addon = (weekly_addon * Decimal('4')).quantize(Decimal('0.01'))
+        total = (Decimal(str(base_price)) + monthly_addon).quantize(Decimal('0.01'))
+        return total, weekly_addon, monthly_addon
+
+    def _assign_coach_round_robin(self, client):
+        from accounts.models import CustomUser
+        from django.db.models import Count
+        
+        # Get all active coaches, ordered by number of clients they already have (fewest first)
+        coaches = CustomUser.objects.filter(role='coach', is_active=True).annotate(
+            client_count=Count('clients')
+        ).order_by('client_count', 'date_joined')
+        
+        if coaches.exists():
+            coach = coaches.first()
+            client.assigned_coach = coach
+            client.save(update_fields=['assigned_coach'])
+            return coach
+        return None
 
     def _apply_coupon_discount(self, plan_price, coupon_code):
         if not coupon_code:
@@ -60,9 +94,35 @@ class PaymentViewSet(viewsets.ViewSet):
         user = request.user
         plan_id = request.data.get('plan_id')
         coupon_code = request.data.get('coupon_code')
+        custom_package = request.data.get('custom_package') or {}
+
+        plan = None
+        is_custom = bool(custom_package)
+        custom_base_plan = None
+        total_price = None
         
         try:
-            plan = SubscriptionPlan.objects.get(id=plan_id)
+            if plan_id:
+                plan = SubscriptionPlan.objects.get(id=plan_id)
+                total_price = plan.price
+            else:
+                custom_base_plan = self._get_custom_coach_base_plan(custom_package.get('base_plan_id'))
+                if not custom_base_plan:
+                    return Response(
+                        {'error': 'Elite base plan not found for custom coaching'},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+                plan = custom_base_plan
+                total_price, weekly_addon, monthly_addon = self._calculate_custom_coach_amount(plan.price, custom_package)
+                custom_package = {
+                    **custom_package,
+                    'base_plan_id': str(plan.id),
+                    'base_plan_name': plan.name,
+                    'base_price': str(plan.price),
+                    'weekly_addon': str(weekly_addon),
+                    'monthly_addon': str(monthly_addon),
+                    'total_price': str(total_price),
+                }
         except SubscriptionPlan.DoesNotExist:
             return Response(
                 {'error': 'Subscription plan not found'},
@@ -81,32 +141,43 @@ class PaymentViewSet(viewsets.ViewSet):
             else:
                 customer_id = user.subscription.stripe_customer_id
             
-            final_price, coupon = self._apply_coupon_discount(plan.price, coupon_code)
+            final_price, coupon = self._apply_coupon_discount(total_price, coupon_code)
             if final_price is None:
                 return Response(coupon, status=status.HTTP_400_BAD_REQUEST)
             if coupon and coupon.applicable_plans.exists() and not coupon.applicable_plans.filter(id=plan.id).exists():
                 return Response({'error': 'Coupon is not applicable to this plan'}, status=status.HTTP_400_BAD_REQUEST)
             amount = int(float(final_price) * 100)  # Convert to cents
+
+            metadata = {
+                'user_id': str(user.id),
+                'plan_id': str(plan.id),
+                'plan_name': plan.name,
+                'coupon_code': coupon.code if coupon else '',
+            }
+            if is_custom:
+                metadata.update({
+                    'package_type': 'custom',
+                    'custom_sessions_per_week': str(custom_package.get('sessions_per_week', '0')),
+                    'custom_session_duration_minutes': str(custom_package.get('session_duration_minutes', '0')),
+                    'custom_hourly_rate': str(custom_package.get('hourly_rate', '0')),
+                    'custom_base_plan_id': str(plan.id),
+                })
             
             intent = stripe.PaymentIntent.create(
                 amount=amount,
                 currency=plan.currency.lower(),
                 customer=customer_id,
-                metadata={
-                    'user_id': str(user.id),
-                    'plan_id': str(plan.id),
-                    'plan_name': plan.name,
-                    'coupon_code': coupon.code if coupon else '',
-                }
+                metadata=metadata,
             )
             
             return Response({
                 'client_secret': intent.client_secret,
                 'payment_intent_id': intent.id,
                 'amount': final_price,
-                'original_amount': plan.price,
+                'original_amount': total_price,
                 'currency': plan.currency,
-                'plan': plan.name,
+                'plan': custom_package.get('name') if is_custom else plan.name,
+                'package_type': 'custom' if is_custom else 'standard',
                 'coupon_applied': coupon.code if coupon else None,
             })
         
@@ -122,12 +193,20 @@ class PaymentViewSet(viewsets.ViewSet):
         user = request.user
         payment_intent_id = request.data.get('payment_intent_id')
         plan_id = request.data.get('plan_id')
+        custom_package = request.data.get('custom_package') or {}
         
         try:
             intent = stripe.PaymentIntent.retrieve(payment_intent_id)
-            plan = SubscriptionPlan.objects.get(id=plan_id)
+            if plan_id:
+                plan = SubscriptionPlan.objects.get(id=plan_id)
+            else:
+                plan = self._get_custom_coach_base_plan(custom_package.get('base_plan_id'))
+                if not plan:
+                    return Response({'error': 'Elite base plan not found for custom coaching'}, status=status.HTTP_404_NOT_FOUND)
             
             if intent.status == 'succeeded':
+                paid_amount = Decimal(str(intent.amount_received or intent.amount or 0)) / Decimal('100')
+
                 # Create or update user subscription
                 user_subscription, created = UserSubscription.objects.get_or_create(
                     user=user,
@@ -148,8 +227,18 @@ class PaymentViewSet(viewsets.ViewSet):
                     user_subscription.end_date = timezone.now() + timedelta(days=plan.duration_days)
                     user_subscription.save()
                 
+                # Auto-assign coach if Elite or Custom
+                if plan.tier and plan.tier.name in ['elite', 'custom'] and not user.assigned_coach:
+                    self._assign_coach_round_robin(user)
+
+                # Record coach payout for Elite/Custom sales
+                coach = user.assigned_coach
+                if coach and plan.tier and plan.tier.name in ['elite', 'custom']:
+                    commission_rate = Decimal('80.00') if plan.tier.name == 'custom' else Decimal('20.00')
+                    payout_amount = (paid_amount * commission_rate / Decimal('100')).quantize(Decimal('0.01'))
+                
+                
                 # Create payment record
-                paid_amount = Decimal(str(intent.amount_received or intent.amount or 0)) / Decimal('100')
                 payment = Payment.objects.create(
                     user=user,
                     subscription_plan=plan,
@@ -158,7 +247,7 @@ class PaymentViewSet(viewsets.ViewSet):
                     currency=plan.currency,
                     status='completed',
                     payment_method='stripe_card',
-                    description=f"Subscription to {plan.name}"
+                    description='Custom coaching package' if (custom_package or (intent.metadata or {}).get('package_type') == 'custom') else f"Subscription to {plan.name}"
                 )
 
                 coupon_code = (intent.metadata or {}).get('coupon_code')
@@ -169,6 +258,22 @@ class PaymentViewSet(viewsets.ViewSet):
                         coupon.save(update_fields=['times_used'])
                     except Coupon.DoesNotExist:
                         pass
+
+                if coach and plan.tier and plan.tier.name in ['elite', 'custom']:
+                    commission_rate = Decimal('80.00') if plan.tier.name == 'custom' else Decimal('20.00')
+                    payout_amount = (paid_amount * commission_rate / Decimal('100')).quantize(Decimal('0.01'))
+                    CoachPayout.objects.get_or_create(
+                        payment=payment,
+                        defaults={
+                            'coach': coach,
+                            'client': user,
+                            'amount': payout_amount,
+                            'commission_rate': commission_rate,
+                            'status': 'pending',
+                            'payout_period': 'monthly',
+                            'notes': f'{plan.tier.name.title()} subscription payout',
+                        }
+                    )
                 
                 # Create invoice
                 invoice_number = f"INV-{user.id}-{timezone.now().strftime('%Y%m%d%H%M%S')}"
@@ -188,7 +293,7 @@ class PaymentViewSet(viewsets.ViewSet):
                 return Response({
                     'message': 'Payment successful',
                     'subscription': user_subscription.id,
-                    'plan': plan.name,
+                    'plan': custom_package.get('name') if custom_package else plan.name,
                     'invoice_number': invoice.invoice_number
                 })
             else:

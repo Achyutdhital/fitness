@@ -5,43 +5,143 @@ import { AdminTable, AdminModal, AdminPageHeader, ConfirmDelete, Field, Input, T
 
 // ── Messages ──────────────────────────────────────────────────────────────────
 export const AdminMessages = () => {
-  const [messages, setMessages] = useState([])
+  const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
-  const [selected, setSelected] = useState(null)
+  const [modal, setModal] = useState(null)
+  const [form, setForm] = useState({})
+  const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
+  const [msg, setMsg] = useState('')
+
+  const STATUS_OPTIONS = [
+    { value: 'open', label: 'Open' },
+    { value: 'in_progress', label: 'In Progress' },
+    { value: 'resolved', label: 'Resolved' },
+    { value: 'closed', label: 'Closed' },
+  ]
+  const PRIORITY_OPTIONS = [
+    { value: 'low', label: 'Low' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'high', label: 'High' },
+    { value: 'urgent', label: 'Urgent' },
+  ]
+  const CATEGORY_OPTIONS = [
+    { value: 'general', label: 'General' },
+    { value: 'account', label: 'Account Access' },
+    { value: 'billing', label: 'Billing & Payments' },
+    { value: 'technical', label: 'Technical Issue' },
+    { value: 'coaching', label: 'Coaching & Sessions' },
+    { value: 'cancellation', label: 'Cancellation' },
+    { value: 'feedback', label: 'Feedback / Feature Request' },
+  ]
+
+  const loadTickets = async () => {
+    setLoading(true)
+    try {
+      const response = await coreAPI.getSupportTickets()
+      setTickets(response.data.results || response.data)
+    } catch (error) {
+      console.error(error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    cmsAPI.getContactMessages().then(r => setMessages(r.data.results || r.data)).catch(console.error).finally(() => setLoading(false))
+    loadTickets()
   }, [])
 
   const cols = [
-    { key: 'name', label: 'Name' },
-    { key: 'email', label: 'Email' },
     { key: 'subject', label: 'Subject' },
-    { key: 'status', label: 'Status', render: v => <Badge label={v} color={v === 'new' ? 'orange' : v === 'replied' ? 'green' : 'gray'} /> },
+    { key: 'requester_name', label: 'Requester', render: (v, row) => v || row.name || '—' },
+    { key: 'email', label: 'Email' },
+    { key: 'category', label: 'Category', render: v => <Badge label={v?.replace('_', ' ') || 'general'} color={v === 'billing' ? 'orange' : v === 'technical' ? 'red' : v === 'coaching' ? 'blue' : 'gray'} /> },
+    { key: 'priority', label: 'Priority', render: v => <Badge label={v} color={v === 'urgent' ? 'red' : v === 'high' ? 'orange' : v === 'medium' ? 'blue' : 'gray'} /> },
+    { key: 'status', label: 'Status', render: v => <Badge label={v.replace('_', ' ')} color={v === 'open' ? 'orange' : v === 'in_progress' ? 'blue' : v === 'resolved' ? 'green' : 'gray'} /> },
     { key: 'created_at', label: 'Date', render: v => v ? new Date(v).toLocaleDateString() : '—' },
   ]
 
+  const filteredTickets = tickets.filter(ticket =>
+    [ticket.subject, ticket.name, ticket.email, ticket.category, ticket.status, ticket.priority]
+      .filter(Boolean)
+      .some(value => value.toLowerCase().includes(search.toLowerCase()))
+  )
+
+  const openCount = tickets.filter(ticket => ticket.status === 'open').length
+  const urgentCount = tickets.filter(ticket => ticket.priority === 'urgent').length
+
+  const openTicket = (ticket) => {
+    setForm({ ...ticket })
+    setModal('edit')
+  }
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      await coreAPI.updateSupportTicket(form.id, {
+        status: form.status,
+        priority: form.priority,
+        category: form.category,
+        admin_notes: form.admin_notes,
+      })
+      setMsg('Ticket updated.')
+      setModal(null)
+      setForm({})
+      await loadTickets()
+    } catch (error) {
+      setMsg('Could not update ticket.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const f = (key) => ({ value: form[key] ?? '', onChange: event => setForm({ ...form, [key]: event.target.value }) })
+
   return (
     <div className="p-6">
-      <AdminPageHeader title="Contact Messages" subtitle={`${messages.length} messages`} search={search} onSearch={setSearch} />
+      <AdminPageHeader title="Support Inbox" subtitle={`${openCount} open · ${urgentCount} urgent`} search={search} onSearch={setSearch} />
+      {msg && <div className="mb-4 p-3 bg-orange-500/20 border border-orange-500/40 text-orange-300 rounded-xl text-sm">{msg}</div>}
       <AdminTable
         columns={cols}
-        rows={messages.filter(m => m.name?.toLowerCase().includes(search.toLowerCase()) || m.subject?.toLowerCase().includes(search.toLowerCase()))}
+        rows={filteredTickets}
         loading={loading}
-        onEdit={setSelected}
+        onEdit={openTicket}
       />
-      {selected && (
-        <AdminModal title="Message Details" onClose={() => setSelected(null)} onSave={() => setSelected(null)} saving={false}>
-          <div className="space-y-3 text-sm">
-            <div className="grid grid-cols-2 gap-3">
-              <div><p className="text-gray-400">From</p><p className="text-white font-semibold">{selected.name}</p></div>
-              <div><p className="text-gray-400">Email</p><p className="text-white">{selected.email}</p></div>
-              {selected.phone && <div><p className="text-gray-400">Phone</p><p className="text-white">{selected.phone}</p></div>}
-              <div><p className="text-gray-400">Date</p><p className="text-white">{new Date(selected.created_at).toLocaleString()}</p></div>
+      {modal === 'edit' && (
+        <AdminModal title="Ticket Details" onClose={() => setModal(null)} onSave={save} saving={saving}>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div><p className="text-gray-400">Requester</p><p className="text-white font-semibold">{form.requester_name || form.name}</p></div>
+              <div><p className="text-gray-400">Email</p><p className="text-white">{form.email}</p></div>
+              <div><p className="text-gray-400">Submitted</p><p className="text-white">{form.created_at ? new Date(form.created_at).toLocaleString() : '—'}</p></div>
+              <div><p className="text-gray-400">Triaged</p><p className="text-white">{form.triaged_at ? new Date(form.triaged_at).toLocaleString() : 'Pending'}</p></div>
             </div>
-            <div><p className="text-gray-400 mb-1">Subject</p><p className="text-white font-semibold">{selected.subject}</p></div>
-            <div><p className="text-gray-400 mb-1">Message</p><p className="text-gray-200 bg-gray-800 rounded-xl p-4 leading-relaxed">{selected.message}</p></div>
+
+            <div>
+              <p className="text-gray-400 mb-1 text-xs uppercase tracking-widest">Subject</p>
+              <p className="text-white font-semibold">{form.subject}</p>
+            </div>
+
+            <div>
+              <p className="text-gray-400 mb-1 text-xs uppercase tracking-widest">Message</p>
+              <p className="text-gray-200 bg-gray-800 rounded-xl p-4 leading-relaxed whitespace-pre-wrap">{form.message}</p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <Field label="Category">
+                <Select {...f('category')} options={CATEGORY_OPTIONS} />
+              </Field>
+              <Field label="Priority">
+                <Select {...f('priority')} options={PRIORITY_OPTIONS} />
+              </Field>
+              <Field label="Status">
+                <Select {...f('status')} options={STATUS_OPTIONS} />
+              </Field>
+            </div>
+
+            <Field label="Admin Notes">
+              <Textarea {...f('admin_notes')} rows={4} placeholder="Internal notes for the support team" />
+            </Field>
           </div>
         </AdminModal>
       )}

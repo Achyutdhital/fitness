@@ -306,16 +306,31 @@ class Command(BaseCommand):
             )
 
             for p_data in t_data['plans']:
-                SubscriptionPlan.objects.update_or_create(
+                plan_qs = SubscriptionPlan.objects.filter(
                     tier=tier,
-                    billing_cycle=p_data['cycle'],
-                    defaults={
-                        'name': f"{tier.get_name_display()} {p_data['cycle'].capitalize()}",
-                        'price': p_data['price'],
-                        'duration_days': p_data['days'],
-                        'priority': tier.priority,
-                    }
-                )
+                    billing_cycle=p_data['cycle']
+                ).order_by('created_at')
+
+                plan = plan_qs.first()
+                if plan:
+                    plan.name = f"{tier.get_name_display()} {p_data['cycle'].capitalize()}"
+                    plan.price = p_data['price']
+                    plan.duration_days = p_data['days']
+                    plan.priority = tier.priority
+                    plan.is_active = True
+                    plan.save()
+                    plan_qs.exclude(pk=plan.pk).delete()
+                else:
+                    SubscriptionPlan.objects.create(
+                        tier=tier,
+                        name=f"{tier.get_name_display()} {p_data['cycle'].capitalize()}",
+                        price=p_data['price'],
+                        currency='USD',
+                        billing_cycle=p_data['cycle'],
+                        duration_days=p_data['days'],
+                        priority=tier.priority,
+                        is_active=True,
+                    )
 
 
 

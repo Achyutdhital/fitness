@@ -1,85 +1,131 @@
 import React, { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { authAPI } from '../services/api'
-import { FiLock } from 'react-icons/fi'
+import { FiLock, FiZap, FiCheckCircle } from 'react-icons/fi'
+import { motion, AnimatePresence } from 'framer-motion'
 
 const ResetPasswordPage = () => {
   const { uid, token } = useParams()
   const navigate = useNavigate()
-  const [formData, setFormData] = useState({ new_password: '', confirm_password: '' })
+  
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match')
+      return
+    }
+
     setLoading(true)
     setError('')
     setMessage('')
     try {
-      const response = await authAPI.confirmPasswordReset(uid, token, formData.new_password, formData.confirm_password)
-      setMessage(response.data?.message || 'Password reset successfully.')
-      setTimeout(() => navigate('/login'), 1200)
+      const response = await authAPI.confirmPasswordReset(uid, token, newPassword, confirmPassword)
+      setMessage(response.data?.message || 'Password reset successful.')
+      setTimeout(() => navigate('/login'), 3000)
     } catch (err) {
-      setError(err.response?.data?.error || err.response?.data?.new_password?.[0] || 'Failed to reset password.')
+      setError(err.response?.data?.error || 'Failed to reset password. Link may be invalid or expired.')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center py-12 px-4">
-      <div className="w-full max-w-md bg-white rounded-lg shadow-xl p-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Reset Password</h1>
-        <p className="text-gray-600 mb-6">Set a new password for your account.</p>
+    <div className="min-h-screen bg-[#0f172a] flex items-center justify-center py-12 px-4 relative overflow-hidden">
+      {/* Background Decor */}
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-orange-500/10 blur-[120px] -z-10 rounded-full" />
+      <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-500/10 blur-[120px] -z-10 rounded-full" />
 
-        {message && <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm">{message}</div>}
-        {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{error}</div>}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="new_password" className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-            <div className="relative">
-              <FiLock className="absolute left-3 top-3 text-gray-400" />
-              <input
-                id="new_password"
-                type="password"
-                value={formData.new_password}
-                onChange={(e) => setFormData({ ...formData, new_password: e.target.value })}
-                required
-                className="input-field pl-10"
-                minLength={8}
-              />
-            </div>
-          </div>
-          <div>
-            <label htmlFor="confirm_password" className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
-            <div className="relative">
-              <FiLock className="absolute left-3 top-3 text-gray-400" />
-              <input
-                id="confirm_password"
-                type="password"
-                value={formData.confirm_password}
-                onChange={(e) => setFormData({ ...formData, confirm_password: e.target.value })}
-                required
-                className="input-field pl-10"
-                minLength={8}
-              />
-            </div>
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="w-full max-w-md"
+      >
+        <div className="bg-slate-900/50 backdrop-blur-2xl rounded-[2.5rem] border border-slate-800/50 p-8 md:p-12 shadow-2xl">
+          <div className="text-center mb-10">
+            <h1 className="text-3xl font-black text-white mb-2 tracking-tight">Create <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-pink-500">Protocol</span></h1>
+            <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Set a new password for your account</p>
           </div>
 
-          <button type="submit" disabled={loading} className="w-full btn btn-primary py-3 font-bold disabled:opacity-50">
-            {loading ? 'Resetting...' : 'Reset Password'}
-          </button>
-        </form>
+          <AnimatePresence mode="wait">
+            {message && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-8 p-4 bg-green-500/10 border border-green-500/20 rounded-2xl flex items-center gap-3 text-green-400 text-xs font-bold"
+              >
+                <FiCheckCircle />
+                <p>{message}</p>
+              </motion.div>
+            )}
+            {error && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3 text-red-400 text-xs font-bold"
+              >
+                <FiZap />
+                <p>{error}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-        <p className="text-center text-gray-600 mt-6 text-sm">
-          Back to{' '}
-          <Link to="/login" className="text-red-500 hover:text-red-600 font-bold">
-            Login
-          </Link>
-        </p>
-      </div>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-4">New Password</label>
+              <div className="relative group">
+                <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500 transition-colors" />
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full bg-slate-800/50 border border-slate-700/50 rounded-2xl py-4 pl-12 pr-4 text-white text-sm focus:outline-none focus:border-orange-500/50 transition-all"
+                  placeholder="Enter new password"
+                  required
+                  minLength={8}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-4">Confirm Password</label>
+              <div className="relative group">
+                <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500 transition-colors" />
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full bg-slate-800/50 border border-slate-700/50 rounded-2xl py-4 pl-12 pr-4 text-white text-sm focus:outline-none focus:border-orange-500/50 transition-all"
+                  placeholder="Confirm new password"
+                  required
+                  minLength={8}
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading || !!message}
+              className="w-full bg-gradient-to-r from-orange-500 to-pink-600 hover:from-orange-600 hover:to-pink-700 text-white rounded-2xl py-5 font-black uppercase tracking-[0.2em] text-xs transition-all shadow-xl shadow-orange-500/20 disabled:opacity-50"
+            >
+              {loading ? 'Processing...' : 'Confirm Update'}
+            </button>
+          </form>
+
+          <div className="mt-10 pt-8 border-t border-slate-800/50 text-center">
+            <Link to="/login" className="text-slate-500 hover:text-orange-400 font-bold text-xs uppercase tracking-widest transition-colors">
+              ← Return to Login
+            </Link>
+          </div>
+        </div>
+      </motion.div>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.utils import timezone
 import uuid
 
 
@@ -232,15 +233,49 @@ class CoachSession(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     coach = models.ForeignKey('accounts.CustomUser', on_delete=models.CASCADE, related_name='sessions_led')
     client = models.ForeignKey('accounts.CustomUser', on_delete=models.CASCADE, related_name='sessions_attended')
+    requested_by = models.ForeignKey('accounts.CustomUser', on_delete=models.SET_NULL, null=True, blank=True, related_name='coach_session_requests')
     scheduled_at = models.DateTimeField()
     duration_minutes = models.IntegerField(default=45)
     status = models.CharField(
         max_length=20, 
-        choices=[('scheduled', 'Scheduled'), ('completed', 'Completed'), ('canceled', 'Canceled')],
-        default='scheduled'
+        choices=[
+            ('pending_approval', 'Pending Approval'),
+            ('scheduled', 'Scheduled'),
+            ('completed', 'Completed'),
+            ('canceled', 'Canceled'),
+            ('reschedule_requested', 'Reschedule Requested'),
+        ],
+        default='pending_approval'
     )
     meeting_link = models.URLField(blank=True)
     notes = models.TextField(blank=True)
+
+
+class CoachPayout(models.Model):
+    """Track revenue share payouts for assigned coaches."""
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('paid', 'Paid'),
+        ('rejected', 'Rejected'),
+    ]
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    coach = models.ForeignKey('accounts.CustomUser', on_delete=models.CASCADE, related_name='payouts_received')
+    client = models.ForeignKey('accounts.CustomUser', on_delete=models.CASCADE, related_name='payouts_generated')
+    payment = models.OneToOneField('payments.Payment', on_delete=models.CASCADE, related_name='coach_payout')
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    commission_rate = models.DecimalField(max_digits=5, decimal_places=2, default=20)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    payout_period = models.CharField(max_length=20, default='monthly')
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.coach.username} payout ${self.amount} ({self.status})"
 
 class Notification(models.Model):
     TYPES = [
@@ -323,35 +358,116 @@ class Referral(models.Model):
 class SupportTicket(models.Model):
     STATUS_CHOICES = [('open', 'Open'), ('in_progress', 'In Progress'), ('resolved', 'Resolved'), ('closed', 'Closed')]
     PRIORITY_CHOICES = [('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('urgent', 'Urgent')]
+    CATEGORY_CHOICES = [
+        ('general', 'General'),
+        ('account', 'Account Access'),
+        ('billing', 'Billing & Payments'),
+        ('technical', 'Technical Issue'),
+        ('coaching', 'Coaching & Sessions'),
+        ('cancellation', 'Cancellation'),
+        ('feedback', 'Feedback / Feature Request'),
+    ]
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey('accounts.CustomUser', on_delete=models.CASCADE, related_name='support_tickets', null=True, blank=True)
     name = models.CharField(max_length=200)
     email = models.EmailField()
     subject = models.CharField(max_length=300)
     message = models.TextField()
+    category = models.CharField(max_length=30, choices=CATEGORY_CHOICES, default='general')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')
     priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='medium')
     admin_notes = models.TextField(blank=True)
+    triaged_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', 'priority', 'created_at']),
+            models.Index(fields=['category', 'created_at']),
+        ]
+
+    @staticmethod
+    def _contains_any(text, keywords):
+        return any(keyword in text for keyword in keywords)
+
+    def auto_triage(self):
+        content = f"{self.subject} {self.message}".lower()
+
+        category_map = [
+            ('billing', ['billing', 'charge', 'charged', 'payment', 'refund', 'invoice', 'plan', 'subscription']),
+            ('account', ['login', 'sign in', 'password', 'account', 'verify', 'verification', 'locked']),
+            ('technical', ['bug', 'error', 'crash', 'broken', 'issue', 'not working', 'glitch', 'failed']),
+            ('coaching', ['coach', 'trainer', 'session', 'appointment', 'book', 'reschedule']),
+            ('cancellation', ['cancel', 'refund', 'downgrade', 'unsubscribe', 'stop membership']),
+            ('feedback', ['feature', 'request', 'idea', 'suggestion', 'feedback']),
+        ]
+
+        priority = 'medium'
+        if self._contains_any(content, ['urgent', 'asap', 'immediately', 'cannot login', "can't login", 'charged twice', 'payment failed', 'stuck on checkout']):
+            priority = 'urgent'
+        elif self._contains_any(content, ['today', 'now', 'blocked', 'error', 'broken', 'refund', 'cancel']):
+            priority = 'high'
+        elif self._contains_any(content, ['question', 'how do i', 'when can', 'info']):
+            priority = 'low'
+
+        category = 'general'
+        for candidate, keywords in category_map:
+            if self._contains_any(content, keywords):
+                category = candidate
+                break
+
+        note_map = {
+            'billing': 'Route to billing queue and confirm payment status.',
+            'account': 'Check authentication, password reset, and account access logs.',
+            'technical': 'Review app logs and reproduce the reported issue.',
+            'coaching': 'Coordinate with coaching team for session or trainer follow-up.',
+            'cancellation': 'Confirm cancellation eligibility and retention options.',
+            'feedback': 'Log product feedback for roadmap review.',
+            'general': 'General inquiry. Respond from the support inbox.',
+        }
+
+        self.category = category
+        self.priority = priority
+        self.admin_notes = self.admin_notes or note_map[category]
+        self.triaged_at = timezone.now()
+
+        return self
 
     def __str__(self):
         return f"[{self.status.upper()}] {self.subject}"
 
 class AIUsage(models.Model):
+    """Track daily and monthly AI message usage per tier"""
     user = models.ForeignKey('accounts.CustomUser', on_delete=models.CASCADE, related_name='ai_usage')
     date = models.DateField(auto_now_add=True)
     count = models.PositiveIntegerField(default=0)
+    month_date = models.DateField(null=True, blank=True)  # First day of the month for monthly tracking
+    monthly_count = models.PositiveIntegerField(default=0)
 
     class Meta:
         unique_together = ('user', 'date')
         verbose_name_plural = "AI Usage Tracking"
 
     def __str__(self):
-        return f"{self.user.username} - {self.date}: {self.count} msgs"
+        return f"{self.user.username} - {self.date}: {self.count} msgs (monthly: {self.monthly_count})"
+    
+    @property
+    def get_tier_limit(self):
+        """Get daily message limit based on user's subscription tier"""
+        try:
+            from subscriptions.models import UserSubscription
+            sub = UserSubscription.objects.filter(
+                user=self.user, status__in=['active', 'trial']
+            ).select_related('plan__tier').order_by('-created_at').first()
+            if sub and sub.plan and sub.plan.tier:
+                tier_name = sub.plan.tier.name.lower()
+                limits = {'free': 5, 'pro': 20, 'elite': 50, 'custom': 100}
+                return limits.get(tier_name, 5)
+        except Exception:
+            pass
+        return 5  # Default to free limit
 
 class AIChatMessage(models.Model):
     ROLE_CHOICES = (
@@ -368,3 +484,65 @@ class AIChatMessage(models.Model):
 
     def __str__(self):
         return f"{self.user.username} ({self.role}): {self.text[:30]}..."
+
+
+class TrainerMessage(models.Model):
+    """Track 1-on-1 trainer messages for Custom tier users"""
+    ROLE_CHOICES = (
+        ('coach', 'Trainer'),
+        ('user', 'User'),
+    )
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey('accounts.CustomUser', on_delete=models.CASCADE, related_name='trainer_messages_received')
+    coach = models.ForeignKey('accounts.CustomUser', on_delete=models.CASCADE, related_name='trainer_messages_sent', limit_choices_to={'role': 'trainer'})
+    text = models.TextField()
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    is_ai_generated = models.BooleanField(default=False, help_text="True if message was AI-assisted")
+    
+    class Meta:
+        ordering = ['timestamp']
+        indexes = [
+            models.Index(fields=['user', 'timestamp']),
+            models.Index(fields=['coach', 'timestamp']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} ← {self.coach.username} ({self.role}): {self.text[:30]}..."
+
+
+class TrainerMessageQuota(models.Model):
+    """Track weekly trainer message quota for Custom tier users"""
+    user = models.OneToOneField('accounts.CustomUser', on_delete=models.CASCADE, related_name='trainer_quota')
+    week_start_date = models.DateField()  # Sunday of the current week
+    messages_this_week = models.PositiveIntegerField(default=0)
+    weekly_limit = models.PositiveIntegerField(default=20)  # 20 messages per week
+    month_start_date = models.DateField()  # 1st of current month
+    messages_this_month = models.PositiveIntegerField(default=0)
+    monthly_limit = models.PositiveIntegerField(default=80)  # ~80 per month (4 weeks * 20)
+    last_updated = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Trainer Message Quota"
+        verbose_name_plural = "Trainer Message Quotas"
+    
+    def __str__(self):
+        return f"{self.user.username}: {self.messages_this_week}/{self.weekly_limit} this week"
+
+
+class EmailAutomationLog(models.Model):
+    """Record one automation send per recipient and day."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    automation_key = models.CharField(max_length=80)
+    recipient_email = models.EmailField()
+    recipient_name = models.CharField(max_length=200, blank=True)
+    reference_date = models.DateField()
+    payload = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        unique_together = ['automation_key', 'recipient_email', 'reference_date']
+
+    def __str__(self):
+        return f"{self.automation_key} -> {self.recipient_email} ({self.reference_date})"

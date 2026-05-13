@@ -1,21 +1,28 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from django.utils import timezone
 from django.db.models import Sum, Count
+from django.core.cache import cache
 
 from .models import (
     WorkoutFavorite, MealPlanFavorite, WorkoutReview,
     BodyMeasurement, Achievement, UserAchievement, UserPoints,
     Challenge, ChallengeParticipation, Notification,
-    Coupon, Referral, SupportTicket,
+    Coupon, Referral, SupportTicket, CoachSession, CoachPayout,
+    AdViewLog, ItemUnlock, CustomizedWorkout
 )
 from .serializers import (
     WorkoutFavoriteSerializer, MealPlanFavoriteSerializer, WorkoutReviewSerializer,
     BodyMeasurementSerializer, AchievementSerializer, UserAchievementSerializer,
     UserPointsSerializer, ChallengeSerializer, NotificationSerializer,
-    CouponSerializer, ReferralSerializer, SupportTicketSerializer,
+    CouponSerializer, ReferralSerializer, SupportTicketSerializer, SupportTicketAdminSerializer, CoachSessionSerializer
+)
+from .ml_engine import get_ml_analysis
+from fitness_project.utils.emails import (
+    send_support_ticket_acknowledgement,
+    send_support_ticket_internal_alert,
 )
 
 
@@ -178,6 +185,18 @@ class ChallengeViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=['post'])
     def join(self, request, pk=None):
+        # Basic tier or higher required to join challenges
+        from accounts.models import UserSubscription
+        has_sub = UserSubscription.objects.filter(
+            user=request.user, 
+            status__in=['active', 'trial']
+        ).exclude(tier__name__iexact='free').exists()
+        
+        if not has_sub and not request.user.is_staff:
+            return Response({
+                'error': 'Basic Protocol required to participate in Challenges. Upgrade to unlock.'
+            }, status=403)
+
         challenge = self.get_object()
         _, created = ChallengeParticipation.objects.get_or_create(
             user=request.user, challenge=challenge
@@ -306,12 +325,48 @@ class AdUnlockViewSet(viewsets.ViewSet):
 class CoachViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
+    @action(detail=False, methods=['get'])
     def get_coach_clients(self, request):
         if request.user.role != 'coach':
             return Response({'error': 'Unauthorized'}, status=403)
         clients = request.user.clients.all()
         from accounts.serializers import CustomUserSerializer
         return Response(CustomUserSerializer(clients, many=True).data)
+
+    @action(detail=False, methods=['get'])
+    def payout_summary(self, request):
+        if request.user.role != 'coach':
+            return Response({'error': 'Unauthorized'}, status=403)
+
+        payouts = CoachPayout.objects.filter(coach=request.user).select_related('client', 'payment')
+        paid_total = payouts.filter(status='paid').aggregate(total=Sum('amount'))['total'] or 0
+        pending_total = payouts.filter(status='pending').aggregate(total=Sum('amount'))['total'] or 0
+        recent = payouts[:5]
+
+        return Response({
+            'coach': {
+                'id': str(request.user.id),
+                'username': request.user.username,
+                'full_name': request.user.get_full_name() or request.user.username,
+            },
+            'summary': {
+                'total_payouts': payouts.count(),
+                'paid_total': float(paid_total),
+                'pending_total': float(pending_total),
+                'combined_total': float(paid_total + pending_total),
+            },
+            'recent_payouts': [
+                {
+                    'id': str(p.id),
+                    'client_name': p.client.get_full_name() or p.client.username,
+                    'amount': float(p.amount),
+                    'commission_rate': float(p.commission_rate),
+                    'status': p.status,
+                    'created_at': p.created_at,
+                }
+                for p in recent
+            ],
+        })
 
     @action(detail=True, methods=['post'])
     def customize_workout(self, request, pk=None):
@@ -385,15 +440,40 @@ class ReferralViewSet(viewsets.ViewSet):
         return Response(ReferralSerializer(referral).data)
 
 
-class SupportTicketViewSet(viewsets.ViewSet):
-    permission_classes = [AllowAny]
+class SupportTicketViewSet(viewsets.ModelViewSet):
+    queryset = SupportTicket.objects.select_related('user').all()
+
+    def get_serializer_class(self):
+        if self.request and self.request.user.is_staff:
+            return SupportTicketAdminSerializer
+        return SupportTicketSerializer
+
+    def get_permissions(self):
+        if self.action in ['submit', 'create']:
+            return [AllowAny()]
+        if self.action == 'my_tickets':
+            return [IsAuthenticated()]
+        return [IsAdminUser()]
+
+    def get_queryset(self):
+        if self.request.user.is_staff:
+            return SupportTicket.objects.select_related('user').all()
+        if self.request.user.is_authenticated:
+            return SupportTicket.objects.select_related('user').filter(user=self.request.user)
+        return SupportTicket.objects.none()
+
+    def perform_create(self, serializer):
+        ticket = serializer.save(user=self.request.user if self.request.user.is_authenticated else None)
+        ticket.auto_triage()
+        ticket.save(update_fields=['category', 'status', 'priority', 'admin_notes', 'triaged_at', 'updated_at'])
+        send_support_ticket_acknowledgement(ticket)
+        send_support_ticket_internal_alert(ticket)
 
     @action(detail=False, methods=['post'])
     def submit(self, request):
         serializer = SupportTicketSerializer(data=request.data)
         if serializer.is_valid():
-            user = request.user if request.user.is_authenticated else None
-            serializer.save(user=user)
+            self.perform_create(serializer)
             return Response({'message': 'Support ticket submitted. We will respond within 24 hours.'}, status=201)
         return Response(serializer.errors, status=400)
 
@@ -401,7 +481,7 @@ class SupportTicketViewSet(viewsets.ViewSet):
     def my_tickets(self, request):
         if not request.user.is_authenticated:
             return Response({'error': 'Authentication required'}, status=401)
-        tickets = SupportTicket.objects.filter(user=request.user)
+        tickets = self.get_queryset()
         return Response(SupportTicketSerializer(tickets, many=True).data)
 
 def _generate_code():
@@ -413,22 +493,42 @@ class AICoachViewSet(viewsets.ViewSet):
     """Tier-gated AI coaching powered by Google Gemini."""
     permission_classes = [IsAuthenticated]
 
+    def _rate_limit_key(self, user_id):
+        window = timezone.now().strftime('%Y%m%d%H%M')
+        return f'ai_coach_rl:{user_id}:{window}'
+
+    def _check_rate_limit(self, user):
+        """Allow at most 3 AI requests per minute per user."""
+        key = self._rate_limit_key(user.id)
+        current_count = cache.get(key, 0)
+        if current_count >= 3:
+            return False, current_count
+        cache.set(key, current_count + 1, timeout=70)
+        return True, current_count + 1
+
+    def _normalize_tier(self, tier):
+        tier = (tier or 'free').lower()
+        if tier == 'custom':
+            return 'elite'
+        return tier
+
     def _get_user_tier(self, user):
         # Superadmin and staff always get Elite access for testing
         if user.is_superuser or user.is_staff:
             return 'elite'
         try:
-            from subscriptions.models import UserSubscription
+            from accounts.models import UserSubscription
             sub = UserSubscription.objects.filter(
                 user=user, status__in=['active', 'trial']
-            ).select_related('plan__tier').order_by('-created_at').first()
-            if sub and sub.plan and sub.plan.tier:
-                return sub.plan.tier.name.lower()
+            ).select_related('subscription_plan__tier').order_by('-created_at').first()
+            if sub and sub.subscription_plan and sub.subscription_plan.tier:
+                return self._normalize_tier(sub.subscription_plan.tier.name)
         except Exception:
             pass
         return 'free'
 
     def _get_system_prompt(self, tier, user):
+        tier = self._normalize_tier(tier)
         base = (
             "You are FitCoachAI, a specialized high-performance Health & Fitness expert. "
             "Your intelligence is strictly focused on: "
@@ -442,11 +542,13 @@ class AICoachViewSet(viewsets.ViewSet):
             "Never compromise your specialty. Your time and intelligence belong ONLY to the user's health journey."
         )
         if tier == 'basic':
+            profile = self._get_user_profile(user)
+            history = self._get_user_history(user)
             return (
-                f"{base} You are assisting a Basic subscriber. "
-                "Provide general fitness guidance, workout tips, and nutrition basics. "
-                "Do NOT provide personalised plans — recommend they upgrade to Pro for that. "
-                "You do not have access to this user's specific workout history or body data."
+                f"{base} You are assisting a Basic member. "
+                f"User profile: {profile}. Recent activity: {history}. "
+                "Provide personalized fitness guidance, workout tips, and nutrition advice. "
+                "Give concrete next-step suggestions based on what they trained most recently."
             )
         elif tier == 'pro':
             profile = self._get_user_profile(user)
@@ -471,13 +573,26 @@ class AICoachViewSet(viewsets.ViewSet):
 
     def _get_user_profile(self, user):
         try:
-            from .models import BodyMeasurement
+            from .models import BodyMeasurement, UserPoints
+            from workouts.models import UserWorkoutProgress
             m = BodyMeasurement.objects.filter(user=user).order_by('-date').first()
             goals = getattr(user, 'fitness_goals', 'general fitness')
             weight = f"{m.weight}kg" if m and m.weight else "not recorded"
+            progress_qs = UserWorkoutProgress.objects.filter(user=user, completed=True)
+            completed = progress_qs.count()
+            calories = progress_qs.aggregate(total=Sum('calories_burnt'))['total'] or 0
+            minutes = progress_qs.aggregate(total=Sum('duration_minutes'))['total'] or 0
+            points, _ = UserPoints.objects.get_or_create(user=user)
+            
+            # Fetch recent measurement trends
+            measurements = BodyMeasurement.objects.filter(user=user).order_by('-date')[:3]
+            m_list = [f"{m.weight}kg on {m.date}" for m in measurements if m.weight]
+            
             return (
                 f"Name: {user.first_name or user.username}, "
-                f"Goals: {goals}, Weight: {weight}"
+                f"Goals: {goals}, Weight History: {', '.join(m_list) or 'None'}, "
+                f"Completed workouts: {completed}, Calories burned: {calories}, "
+                f"Training minutes: {minutes}, Streak: {points.streak_days}, Level: {points.get_level_name()}"
             )
         except Exception:
             return f"User: {user.username}"
@@ -497,6 +612,145 @@ class AICoachViewSet(viewsets.ViewSet):
             pass
         return "No recent workout data"
 
+    def _get_ai_snapshot(self, user):
+        try:
+            from .models import BodyMeasurement, UserPoints
+            from workouts.models import UserWorkoutProgress
+
+            progress_qs = UserWorkoutProgress.objects.filter(user=user, completed=True).order_by('-created_at')
+            completed = progress_qs.count()
+            calories = progress_qs.aggregate(total=Sum('calories_burnt'))['total'] or 0
+            minutes = progress_qs.aggregate(total=Sum('duration_minutes'))['total'] or 0
+            recent = list(progress_qs.select_related('workout')[:3])
+            points, _ = UserPoints.objects.get_or_create(user=user)
+            measurements = list(BodyMeasurement.objects.filter(user=user).order_by('-date')[:2])
+            body = measurements[0] if measurements else None
+            previous_body = measurements[1] if len(measurements) > 1 else None
+            goal = getattr(user, 'fitness_goal', None) or getattr(getattr(user, 'profile', None), 'goals', None) or 'general fitness'
+            weight_trend = None
+            if body and previous_body and body.weight and previous_body.weight:
+                weight_trend = round(float(body.weight) - float(previous_body.weight), 1)
+            return {
+                'completed': completed,
+                'calories': calories,
+                'minutes': minutes,
+                'streak': points.streak_days,
+                'level': points.get_level_name(),
+                'goal': goal,
+                'weight': body.weight if body and body.weight else None,
+                'body_fat': body.body_fat_percentage if body and body.body_fat_percentage is not None else None,
+                'weight_trend': weight_trend,
+                'latest_measurement_date': body.date.strftime('%b %d') if body else None,
+                'recent': recent,
+            }
+        except Exception:
+            return {
+                'completed': 0,
+                'calories': 0,
+                'minutes': 0,
+                'streak': 0,
+                'level': 'Initiate',
+                'goal': 'general fitness',
+                'weight': None,
+                'body_fat': None,
+                'weight_trend': None,
+                'latest_measurement_date': None,
+                'recent': [],
+            }
+
+    def _build_fallback_reply(self, user, tier, message):
+        tier = self._normalize_tier(tier)
+        snapshot = self._get_ai_snapshot(user)
+        recent_title = None
+        if snapshot['recent']:
+            recent_title = getattr(snapshot['recent'][0].workout, 'title', None)
+
+        message_lower = (message or '').lower()
+        goal = str(snapshot.get('goal') or '').lower()
+
+        if any(term in message_lower for term in ['measurement', 'measurements', 'body fat', 'weight', 'scale', 'progress']):
+            weight_text = f"{snapshot['weight']}" if snapshot['weight'] is not None else 'not recorded yet'
+            body_fat_text = f"{snapshot['body_fat']}%" if snapshot['body_fat'] is not None else 'not recorded yet'
+            trend_text = ''
+            if snapshot['weight_trend'] is not None:
+                direction = 'up' if snapshot['weight_trend'] > 0 else 'down'
+                trend_text = f" Your weight is {direction} by {abs(snapshot['weight_trend'])} since the previous check."
+            next_step = 'keep your calories tight and add one strength session plus a walking block tomorrow' if 'lose' in goal else 'keep protein high and push a progressive strength session tomorrow' if 'gain' in goal else 'stay consistent with one quality workout and a recovery walk tomorrow'
+            return (
+                f"Your latest check-in shows weight {weight_text} and body fat {body_fat_text}.{trend_text} "
+                f"Based on your goal, {next_step}."
+            )
+
+        if any(term in message_lower for term in ['stat', 'progress', 'overview', 'summary']):
+            return (
+                f"Here is your current training overview: {snapshot['completed']} completed workouts, "
+                f"{snapshot['minutes']} training minutes, {snapshot['calories']} calories burnt, "
+                f"and a {snapshot['streak']}-day streak. "
+                f"Your latest weight snapshot is {snapshot['weight'] or 'not recorded'}. "
+                f"Next step: keep the streak alive and add one quality session this week."
+            )
+
+        if any(term in message_lower for term in ['workout', 'train', 'training', 'next', 'today', 'plan']):
+            # Plan a task looking at measurements and goal
+            weight = snapshot.get('weight')
+            goal = str(snapshot.get('goal') or '').lower()
+            
+            if recent_title:
+                # If they already did a workout, suggest progression or variation
+                progression = "+1 set or +5lbs" if 'gain' in goal else "shorter rest periods" if 'lose' in goal else "perfected form"
+                return (
+                    f"Great job on {recent_title}! For tomorrow, let's build on that baseline. "
+                    f"Since your goal is {goal or 'fitness'}, I suggest a session with {progression}. "
+                    f"Focus on compound movements: Push, Pull, Legs, and Core. "
+                    f"Log your performance so I can calculate your next load increase."
+                )
+            
+            # If no recent workout, give the baseline session but mention measurements
+            measurement_note = ""
+            if weight:
+                measurement_note = f"Looking at your current weight of {weight}lbs, "
+            
+            return (
+                f"{measurement_note}Let's start with a full-body baseline session: "
+                f"Push (Push-ups/Bench), Pull (Rows/Pull-ups), Legs (Squats/Lunges), and Core (Plank). "
+                f"Keep intensity at 7/10. Log this workout so I can tailor your next day suggestion specifically to your performance."
+            )
+
+        if any(term in message_lower for term in ['nutrition', 'diet', 'meal', 'food']):
+            goal = str(snapshot.get('goal') or '').lower()
+            protein_goal = "1.2g per lb of bodyweight" if 'gain' in goal else "1g per lb"
+            return (
+                f"For your {goal or 'fitness'} goal, aim for {protein_goal} of protein daily. "
+                "Place most of your complex carbs (oats, rice, sweet potatoes) around your training window. "
+                "Stay hydrated and log your meals in the nutrition tab for a full macro breakdown."
+            )
+
+        if any(term in message_lower for term in ['recover', 'sleep', 'rest', 'sore']):
+            return (
+                "Recovery is where the growth happens. Prioritize 7-9 hours of sleep. "
+                "If you're feeling extra sore, swap tomorrow's session for a 30-minute zone 2 walk and some mobility work. "
+                "Don't skip the protein even on rest days!"
+            )
+
+        if tier == 'elite':
+            return (
+                f"Elite Protocol Status: {snapshot['completed']} workouts completed, {snapshot['streak']}-day streak. "
+                f"Your latest weight trend is {snapshot['weight_trend'] or 'stable'}. "
+                "Next high-impact move: Hit a 45-minute strength session tomorrow focusing on eccentric control. "
+                "I'm monitoring your data for the next program adjustment."
+            )
+
+        if tier == 'pro':
+            return (
+                f"Pro Status: {snapshot['completed']} sessions logged. Your current level is {snapshot['level']}. "
+                "Consistency is key. Tomorrow, stick to the plan and aim for one small improvement over your last session."
+            )
+
+        return (
+            f"You've logged {snapshot['completed']} workouts so far. Keep that {snapshot['streak']}-day streak alive! "
+            "Your next step is to complete a full-body baseline session and log it so I can adapt your protocol."
+        )
+
     @action(detail=False, methods=['get'])
     def history(self, request):
         from .models import AIChatMessage
@@ -515,29 +769,138 @@ class AICoachViewSet(viewsets.ViewSet):
         data = [{'role': m.role, 'text': m.text, 'timestamp': m.timestamp} for m in reversed(messages)]
         return Response(data)
 
+    @action(detail=False, methods=['get'])
+    def analyze_and_suggest(self, request):
+        """Advanced data analysis and recommendation engine"""
+        user = request.user
+        snapshot = self._get_ai_snapshot(user)
+        model_insight = get_ml_analysis(snapshot)
+        
+        # 1. Measurement Analysis
+        weight = snapshot.get('weight')
+        trend = snapshot.get('weight_trend')
+        goal = str(snapshot.get('goal') or '').lower()
+        
+        analysis = []
+        recommendation = ""
+        
+        if weight:
+            if trend is not None:
+                if trend > 0:
+                    analysis.append(f"Weight is trending UP (+{trend}kg).")
+                    if 'lose' in goal:
+                        recommendation = "Suggesting a 15% reduction in daily carb intake and adding 15 mins of steady-state cardio to each session."
+                    elif 'gain' in goal:
+                        recommendation = "Good progress. Ensure 2g of protein per kg of bodyweight to prioritize muscle over fat gain."
+                elif trend < 0:
+                    analysis.append(f"Weight is trending DOWN ({trend}kg).")
+                    if 'gain' in goal:
+                        recommendation = "Caloric deficit detected. Increase daily intake by 300-500 clean calories to support muscle growth."
+                    elif 'lose' in goal:
+                        recommendation = "Perfect trend for fat loss. Maintain current volume to preserve lean mass."
+                else:
+                    analysis.append("Weight is STABLE.")
+            else:
+                analysis.append(f"Current weight is {weight}kg. We need one more check-in to establish a trend.")
+        
+        # 2. Performance Analysis
+        completed = snapshot.get('completed', 0)
+        if completed > 0:
+            analysis.append(f"Training consistency is high ({completed} sessions logged).")
+        else:
+            analysis.append("No training history detected yet. The first week is critical for baseline metrics.")
+
+        analysis.append(
+            f"Readiness score: {model_insight['model_score']}/100 with {int(model_insight['model_confidence'] * 100)}% signal strength."
+        )
+        if model_insight['supporting_signals']:
+            analysis.extend(model_insight['supporting_signals'][:2])
+            
+        # 3. Final Verdict
+        if not recommendation:
+            recommendation = model_insight['suggested_solution']
+
+        recommendation = model_insight['suggested_solution'] or recommendation
+            
+        return Response({
+            'analysis': analysis,
+            'suggested_solution': recommendation,
+            'next_step': "Log tomorrow's workout and a fresh morning weight measurement for further refinement.",
+            'model_name': model_insight['model_name'],
+            'model_score': model_insight['model_score'],
+            'model_confidence': model_insight['model_confidence'],
+            'training_samples': model_insight['training_samples'],
+            'recommended_focus': model_insight['recommended_focus'],
+            'supporting_signals': model_insight['supporting_signals'],
+        })
+
     @action(detail=False, methods=['post'])
     def chat(self, request):
         from .models import AIUsage, AIChatMessage
         from django.utils import timezone
+        from datetime import date
         
         tier = self._get_user_tier(request.user)
         is_admin = request.user.is_staff or request.user.is_superuser
-        
-        if tier == 'free' and not is_admin:
-            return Response({'error': 'upgrade_required', 'message': 'AI Coach is available from Basic plan onwards.'}, status=403)
 
-        # 1. Define Tier Limits
-        TIER_LIMITS = {'basic': 5, 'pro': 20, 'elite': 50}
+        if not is_admin:
+            allowed, _ = self._check_rate_limit(request.user)
+            if not allowed:
+                return Response({
+                    'error': 'rate_limited',
+                    'message': 'Please wait a moment before sending another AI message.',
+                }, status=429)
         
-        # 2. Check Daily Usage (Admins get a pass)
+        # Define Tier Limits (Daily and Monthly)
+        TIER_LIMITS = {
+            'free': {'daily': 5, 'monthly': 100},
+            'pro': {'daily': 20, 'monthly': 400},
+            'elite': {'daily': 50, 'monthly': 1000},
+            'custom': {'daily': 100, 'monthly': 2000},
+        }
+        
+        # Check Daily Usage (Admins get a pass)
         today = timezone.now().date()
         usage_record, _ = AIUsage.objects.get_or_create(user=request.user, date=today)
         
-        limit = TIER_LIMITS.get(tier, 0)
-        if not is_admin and usage_record.count >= limit:
+        tier_normalized = self._normalize_tier(tier)
+        tier_config = TIER_LIMITS.get(tier_normalized, TIER_LIMITS['free'])
+        daily_limit = tier_config['daily']
+        monthly_limit = tier_config['monthly']
+        
+        # Initialize monthly tracking
+        if not usage_record.month_date or usage_record.month_date.replace(day=1) != today.replace(day=1):
+            usage_record.month_date = today.replace(day=1)
+            usage_record.monthly_count = 0
+        
+        # Check daily limit
+        if not is_admin and usage_record.count >= daily_limit:
             return Response({
-                'error': 'limit_reached',
-                'reply': f"⚡ You've reached your daily limit of {limit} messages. Your coaching energy refills tomorrow!",
+                'error': 'daily_limit_reached',
+                'message': f"⚡ You've reached your daily limit of {daily_limit} messages. Your coaching energy refills tomorrow!",
+                'quota': {
+                    'daily_limit': daily_limit,
+                    'daily_used': usage_record.count,
+                    'daily_remaining': 0,
+                    'monthly_limit': monthly_limit,
+                    'monthly_used': usage_record.monthly_count,
+                    'monthly_remaining': max(0, monthly_limit - usage_record.monthly_count),
+                }
+            }, status=403)
+        
+        # Check monthly limit
+        if not is_admin and usage_record.monthly_count >= monthly_limit:
+            return Response({
+                'error': 'monthly_limit_reached',
+                'message': f"📅 You've reached your monthly limit of {monthly_limit} messages. Next cycle starts on the 1st!",
+                'quota': {
+                    'daily_limit': daily_limit,
+                    'daily_used': usage_record.count,
+                    'daily_remaining': max(0, daily_limit - usage_record.count),
+                    'monthly_limit': monthly_limit,
+                    'monthly_used': usage_record.monthly_count,
+                    'monthly_remaining': 0,
+                }
             }, status=403)
 
         message = (request.data.get('message') or '').strip()
@@ -573,7 +936,11 @@ class AICoachViewSet(viewsets.ViewSet):
         for k in claude_keys: providers.append({'type': 'claude', 'key': k})
 
         if not providers:
-            return Response({'reply': "AI Coach is not configured. Please add keys to .env."})
+            fallback_reply = self._build_fallback_reply(request.user, tier, message)
+            usage_record.count += 1
+            usage_record.save()
+            AIChatMessage.objects.create(user=request.user, role='model', text=fallback_reply)
+            return Response({'reply': fallback_reply, 'tier': tier, 'provider': 'fallback', 'usage_today': usage_record.count})
 
         import random
         random.shuffle(providers)
@@ -637,12 +1004,20 @@ class AICoachViewSet(viewsets.ViewSet):
                     # SUCCESS: SAVE AI RESPONSE
                     AIChatMessage.objects.create(user=request.user, role='model', text=resp_text)
                     usage_record.count += 1
+                    usage_record.monthly_count += 1
                     usage_record.save()
                     return Response({
                         'reply': resp_text,
-                        'tier': tier,
+                        'tier': tier_normalized,
                         'provider': prov_name,
-                        'usage_today': usage_record.count
+                        'quota': {
+                            'daily_limit': daily_limit,
+                            'daily_used': usage_record.count,
+                            'daily_remaining': max(0, daily_limit - usage_record.count),
+                            'monthly_limit': monthly_limit,
+                            'monthly_used': usage_record.monthly_count,
+                            'monthly_remaining': max(0, monthly_limit - usage_record.monthly_count),
+                        }
                     })
 
             except Exception as e:
@@ -650,5 +1025,242 @@ class AICoachViewSet(viewsets.ViewSet):
                 logger.warning(f"AI Provider Failover: {p['type']} failed - {str(e)[:50]}")
                 continue
 
-        user_msg = "⚡ AI Coach is temporarily busy. Please try again in 30 seconds."
-        return Response({'reply': user_msg, 'error_detail': str(last_error) if getattr(ds, 'DEBUG', False) else None})
+        fallback_reply = self._build_fallback_reply(request.user, tier_normalized, message)
+        AIChatMessage.objects.create(user=request.user, role='model', text=fallback_reply)
+        usage_record.count += 1
+        usage_record.monthly_count += 1
+        usage_record.save()
+        return Response({
+            'reply': fallback_reply,
+            'tier': tier_normalized,
+            'provider': 'fallback',
+            'quota': {
+                'daily_limit': daily_limit,
+                'daily_used': usage_record.count,
+                'daily_remaining': max(0, daily_limit - usage_record.count),
+                'monthly_limit': monthly_limit,
+                'monthly_used': usage_record.monthly_count,
+                'monthly_remaining': max(0, monthly_limit - usage_record.monthly_count),
+            },
+            'error_detail': str(last_error) if getattr(ds, 'DEBUG', False) else None,
+        })
+
+    @action(detail=False, methods=['get'])
+    def quota(self, request):
+        """Get current AI message quota for the user"""
+        from .models import AIUsage
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        tier = self._get_user_tier(request.user)
+        tier_normalized = self._normalize_tier(tier)
+        
+        TIER_LIMITS = {
+            'free': {'daily': 5, 'monthly': 100},
+            'pro': {'daily': 20, 'monthly': 400},
+            'elite': {'daily': 50, 'monthly': 1000},
+            'custom': {'daily': 100, 'monthly': 2000},
+        }
+        
+        tier_config = TIER_LIMITS.get(tier_normalized, TIER_LIMITS['free'])
+        today = timezone.now().date()
+        usage_record, _ = AIUsage.objects.get_or_create(user=request.user, date=today)
+        
+        # Initialize monthly tracking if needed
+        if not usage_record.month_date or usage_record.month_date.replace(day=1) != today.replace(day=1):
+            usage_record.month_date = today.replace(day=1)
+            usage_record.monthly_count = 0
+            usage_record.save()
+        
+        return Response({
+            'tier': tier_normalized,
+            'quota': {
+                'daily_limit': tier_config['daily'],
+                'daily_used': usage_record.count,
+                'daily_remaining': max(0, tier_config['daily'] - usage_record.count),
+                'monthly_limit': tier_config['monthly'],
+                'monthly_used': usage_record.monthly_count,
+                'monthly_remaining': max(0, tier_config['monthly'] - usage_record.monthly_count),
+                'reset_date': (today.replace(day=1) + timedelta(days=32)).replace(day=1),
+            }
+        })
+
+    @action(detail=False, methods=['get'])
+    def history(self, request):
+        """Get AI chat history for the user"""
+        from .models import AIChatMessage
+        from django.core.paginator import Paginator
+        
+        page = int(request.query_params.get('page', 1))
+        page_size = int(request.query_params.get('page_size', 20))
+        
+        messages = AIChatMessage.objects.filter(user=request.user).order_by('-timestamp')
+        paginator = Paginator(messages, page_size)
+        
+        try:
+            page_obj = paginator.page(page)
+        except Exception:
+            return Response({'error': 'Invalid page'}, status=400)
+        
+        from .serializers import AIChatMessageSerializer
+        serializer = AIChatMessageSerializer(page_obj.object_list, many=True)
+        
+        return Response({
+            'count': paginator.count,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': paginator.num_pages,
+            'results': serializer.data
+        })
+
+
+class CoachSessionViewSet(viewsets.ModelViewSet):
+    serializer_class = CoachSessionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'coach':
+            return CoachSession.objects.filter(coach=user).order_by('scheduled_at')
+        return CoachSession.objects.filter(client=user).order_by('scheduled_at')
+
+    @action(detail=False, methods=['get'])
+    def my_sessions(self, request):
+        serializer = self.get_serializer(self.get_queryset(), many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def respond(self, request, pk=None):
+        session = self.get_object()
+        user = request.user
+        decision = (request.data.get('decision') or '').lower()
+
+        if user not in [session.client, session.coach]:
+            return Response({'error': 'You are not allowed to respond to this session'}, status=status.HTTP_403_FORBIDDEN)
+
+        if decision not in ['accept', 'decline', 'counter']:
+            return Response({'error': 'decision must be accept, decline, or counter'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if decision == 'counter':
+            new_time = request.data.get('scheduled_at')
+            if not new_time:
+                return Response({'error': 'scheduled_at is required for counter proposals'}, status=status.HTTP_400_BAD_REQUEST)
+            session.scheduled_at = new_time
+            session.duration_minutes = int(request.data.get('duration_minutes', session.duration_minutes))
+            session.status = 'pending_approval'
+            session.requested_by = user
+            session.meeting_link = ''
+            session.save()
+            return Response(CoachSessionSerializer(session).data)
+
+        if decision == 'decline':
+            session.status = 'canceled'
+            session.save(update_fields=['status'])
+            return Response(CoachSessionSerializer(session).data)
+
+        session.status = 'scheduled'
+        if not session.meeting_link:
+            room_name = f"FitCoachPro_{session.client.username}_{session.coach.username}_{session.id.hex[:12]}"
+            session.meeting_link = f'https://meet.jit.si/{room_name}'
+        session.save(update_fields=['status', 'meeting_link'])
+        return Response(CoachSessionSerializer(session).data)
+
+    def create(self, request, *args, **kwargs):
+        # Coach can directly schedule for assigned clients.
+        if request.user.role == 'coach':
+            client_id = request.data.get('client_id')
+            scheduled_at = request.data.get('scheduled_at')
+            if not client_id or not scheduled_at:
+                return Response({'error': 'client_id and scheduled_at are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            from accounts.models import CustomUser
+            client = CustomUser.objects.filter(id=client_id, assigned_coach=request.user).first()
+            if not client:
+                return Response({'error': 'Client not assigned to this coach'}, status=status.HTTP_403_FORBIDDEN)
+
+            session = CoachSession.objects.create(
+                client=client,
+                coach=request.user,
+                scheduled_at=scheduled_at,
+                duration_minutes=int(request.data.get('duration_minutes', 30)),
+                status='pending_approval',
+                requested_by=request.user,
+                meeting_link=''
+            )
+            return Response(CoachSessionSerializer(session).data, status=status.HTTP_201_CREATED)
+
+        # 1. Determine Tier
+        # We can reuse the logic from AICoachViewSet
+        def _get_tier(user):
+            if user.is_superuser or user.is_staff: return 'elite'
+            try:
+                from accounts.models import UserSubscription
+                sub = UserSubscription.objects.filter(
+                    user=user, status__in=['active', 'trial']
+                ).select_related('subscription_plan__tier').order_by('-created_at').first()
+                if sub and sub.subscription_plan and sub.subscription_plan.tier:
+                    return sub.subscription_plan.tier.name.lower()
+            except: pass
+            return 'free'
+
+        tier = _get_tier(request.user)
+
+        # 2. Check limits based on Tier
+        if tier == 'free':
+            return Response({'error': 'Coaching sessions require Elite or Custom tier.'}, status=status.HTTP_403_FORBIDDEN)
+
+        limit = 2
+        try:
+            from subscriptions.models import SubscriptionTier
+            tier_row = SubscriptionTier.objects.filter(name=tier).first()
+            if tier_row and tier_row.video_sessions_per_month:
+                limit = tier_row.video_sessions_per_month
+        except Exception:
+            pass
+
+        # Check how many sessions this month
+        from django.utils import timezone
+        from datetime import datetime
+        
+        now = timezone.now()
+        start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        
+        session_count = CoachSession.objects.filter(
+            client=request.user,
+            scheduled_at__gte=start_of_month,
+            status__in=['pending_approval', 'scheduled', 'completed', 'reschedule_requested']
+        ).count()
+
+        if session_count >= limit:
+            return Response({'error': f'You have reached your monthly limit of {limit} session(s).'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 3. Create Session
+        scheduled_at = request.data.get('scheduled_at')
+        if not scheduled_at:
+            return Response({'error': 'scheduled_at is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Default to the first superuser as coach for demo purposes
+        from accounts.models import CustomUser
+        coach = CustomUser.objects.filter(is_staff=True).first()
+
+        session = CoachSession.objects.create(
+            client=request.user,
+            coach=coach if coach else request.user, # Fallback
+            scheduled_at=scheduled_at,
+            duration_minutes=int(request.data.get('duration_minutes', 30)),
+            status='pending_approval',
+            requested_by=request.user,
+            meeting_link=''
+        )
+
+        return Response(CoachSessionSerializer(session).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        session = self.get_object()
+        if session.status == 'canceled':
+            return Response({'message': 'Already canceled'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        session.status = 'canceled'
+        session.save()
+        return Response({'message': 'Session cancelled successfully'})

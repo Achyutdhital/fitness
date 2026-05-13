@@ -216,6 +216,17 @@ class UserWorkoutProgress(models.Model):
     user = models.ForeignKey('accounts.CustomUser', on_delete=models.CASCADE, related_name='workout_progress')
     workout = models.ForeignKey(Workout, on_delete=models.CASCADE, related_name='user_progress')
     completed = models.BooleanField(default=False)
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ('not_started', 'Not Started'),
+            ('in_progress', 'In Progress'),
+            ('completed', 'Completed'),
+            ('paused', 'Paused'),
+        ],
+        default='not_started'
+    )
+    started_at = models.DateTimeField(null=True, blank=True)
     completed_date = models.DateTimeField(null=True, blank=True)
     calories_burnt = models.IntegerField(null=True, blank=True)
     duration_minutes = models.IntegerField(null=True, blank=True)
@@ -229,3 +240,20 @@ class UserWorkoutProgress(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.workout.title}"
+
+class WorkoutSet(models.Model):
+    """Granular performance tracking for each set in a workout"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    progress = models.ForeignKey(UserWorkoutProgress, on_delete=models.CASCADE, related_name='sets')
+    exercise = models.ForeignKey(Exercise, on_delete=models.CASCADE)
+    set_number = models.PositiveIntegerField()
+    weight = models.FloatField(null=True, blank=True, help_text="Weight used in lbs/kg")
+    reps = models.PositiveIntegerField(null=True, blank=True)
+    is_completed = models.BooleanField(default=False)
+    completed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['progress', 'exercise', 'set_number']
+
+    def __str__(self):
+        return f"{self.progress.user.username} - {self.exercise.name} - Set {self.set_number}"

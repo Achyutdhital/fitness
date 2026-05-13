@@ -1,144 +1,134 @@
 import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { FiMail, FiLock } from 'react-icons/fi'
+import { FiUser, FiLock, FiZap, FiArrowRight } from 'react-icons/fi'
+import { motion, AnimatePresence } from 'framer-motion'
 
 const LoginPage = () => {
-  const [formData, setFormData] = useState({ username: '', password: '' })
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { login } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
-    setError('')
-  }
+  const from = location.state?.from?.pathname || '/dashboard'
+  const selectedPlan = location.state?.plan || null
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
-    const result = await login(formData.username, formData.password)
-    
+    const result = await login(username, password)
     if (result.success) {
-      navigate('/dashboard')
+      if (selectedPlan) {
+        navigate('/payment', { state: { plan: selectedPlan } })
+      } else {
+        navigate(from, { replace: true })
+      }
     } else {
-      setError(result.error || 'Login failed')
+      setError(result.error)
     }
-    
     setLoading(false)
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center py-12 px-4">
-      <div className="w-full max-w-md">
-        <div className="bg-white rounded-lg shadow-xl p-8">
-          {/* Logo */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-red-500 rounded-lg mb-4">
-              <span className="text-3xl">💪</span>
-            </div>
-            <h1 className="text-3xl font-bold text-gray-900">FitnessPro</h1>
-            <p className="text-gray-600 mt-2">Welcome back</p>
+    <div className="min-h-screen bg-[#0f172a] flex items-center justify-center py-12 px-4 relative overflow-hidden">
+      {/* Background Decor */}
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-orange-500/10 blur-[120px] -z-10 rounded-full" />
+      <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-500/10 blur-[120px] -z-10 rounded-full" />
+
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="w-full max-w-md"
+      >
+        <div className="bg-slate-900/50 backdrop-blur-2xl rounded-[2.5rem] border border-slate-800/50 p-8 md:p-12 shadow-2xl">
+          <div className="text-center mb-10">
+            <Link to="/" className="inline-flex items-center space-x-2 mb-6">
+              <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-pink-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-orange-500/20">
+                <FiZap size={24} />
+              </div>
+              <span className="text-2xl font-black text-white tracking-tighter uppercase">FitCoach<span className="text-orange-500">Pro</span></span>
+            </Link>
+            <h1 className="text-4xl font-black text-white mb-2 tracking-tight">Welcome <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-pink-500">Back</span></h1>
+            <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Access your elite training dashboard</p>
           </div>
 
-          {/* Error Alert */}
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-600 text-sm">{error}</p>
-            </div>
-          )}
+          <AnimatePresence mode="wait">
+            {error && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3 text-red-400 text-xs font-bold"
+              >
+                <FiZap />
+                <p>{error}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
-                Username or Email
-              </label>
-              <div className="relative">
-                <FiMail className="absolute left-3 top-3 text-gray-400" />
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-4">Identity</label>
+              <div className="relative group">
+                <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500 transition-colors" />
                 <input
                   type="text"
-                  id="username"
-                  name="username"
-                  value={formData.username}
-                  onChange={handleChange}
-                  className="input-field pl-10"
-                  placeholder="Enter your username or email"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full bg-slate-800/50 border border-slate-700/50 rounded-2xl py-4 pl-12 pr-4 text-white text-sm focus:outline-none focus:border-orange-500/50 transition-all"
+                  placeholder="Username"
                   required
                 />
               </div>
             </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <FiLock className="absolute left-3 top-3 text-gray-400" />
+            <div className="space-y-2">
+              <div className="flex justify-between items-center ml-4">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Credential</label>
+                <Link to="/forgot-password" size={10} className="text-[10px] font-black uppercase tracking-widest text-orange-500 hover:text-orange-400">Recovery</Link>
+              </div>
+              <div className="relative group">
+                <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500 transition-colors" />
                 <input
                   type="password"
-                  id="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  className="input-field pl-10"
-                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-slate-800/50 border border-slate-700/50 rounded-2xl py-4 pl-12 pr-4 text-white text-sm focus:outline-none focus:border-orange-500/50 transition-all"
+                  placeholder="Password"
                   required
                 />
               </div>
-            </div>
-
-            <div className="flex items-center justify-between text-sm">
-              <label className="flex items-center">
-                <input type="checkbox" className="mr-2" />
-                <span className="text-gray-600">Remember me</span>
-              </label>
-              <Link to="/forgot-password" className="text-red-500 hover:text-red-600">
-                Forgot password?
-              </Link>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full btn btn-primary py-3 font-bold disabled:opacity-50"
+              className="w-full bg-gradient-to-r from-orange-500 to-pink-600 hover:from-orange-600 hover:to-pink-700 text-white rounded-2xl py-5 font-black uppercase tracking-[0.2em] text-xs transition-all shadow-xl shadow-orange-500/20 disabled:opacity-50 flex items-center justify-center gap-3"
             >
-              {loading ? 'Logging in...' : 'Login'}
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  <span>Authenticate</span>
+                  <FiArrowRight />
+                </>
+              )}
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="my-6 relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">Or continue with</span>
-            </div>
+          <div className="mt-10 pt-8 border-t border-slate-800/50 text-center">
+            <p className="text-slate-500 text-sm font-bold">
+              New to the platform?{' '}
+              <Link to="/register" className="text-orange-500 hover:text-orange-400 transition-colors">Apply Now</Link>
+            </p>
           </div>
-
-          {/* Social Login */}
-          <div className="grid grid-cols-2 gap-4">
-            <button type="button" className="border border-gray-300 rounded-lg py-2 hover:bg-gray-50 transition">
-              Google
-            </button>
-            <button type="button" className="border border-gray-300 rounded-lg py-2 hover:bg-gray-50 transition">
-              Facebook
-            </button>
-          </div>
-
-          {/* Sign Up Link */}
-          <p className="text-center text-gray-600 mt-6">
-            Don't have an account?{' '}
-            <Link to="/register" className="text-red-500 hover:text-red-600 font-bold">
-              Sign up
-            </Link>
-          </p>
         </div>
-      </div>
+      </motion.div>
     </div>
   )
 }

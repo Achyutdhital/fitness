@@ -5,15 +5,16 @@ class SubscriptionTier(models.Model):
     """Tier definitions: Free, Basic, Pro, Elite"""
     TIER_CHOICES = [
         ('free', 'Free'),
-        ('basic', 'Basic'),
         ('pro', 'Pro'),
         ('elite', 'Elite'),
+        ('custom', 'Custom'),
     ]
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=20, choices=TIER_CHOICES, unique=True)
     description = models.TextField()
     features = models.JSONField(default=list)
     sessions_per_week = models.IntegerField(default=0, help_text="1-on-1 sessions per week")
+    video_sessions_per_month = models.IntegerField(default=0, help_text="Video coaching sessions included per month")
     priority = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 

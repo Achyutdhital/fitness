@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import (
     Workout, Exercise, WorkoutCategory, MealPlan, Meal, 
-    UserWorkoutProgress, WorkoutProgram, WorkoutPhase, ScheduledWorkout
+    UserWorkoutProgress, WorkoutProgram, WorkoutPhase, ScheduledWorkout, WorkoutSet
 )
 
 
@@ -86,13 +86,21 @@ class WorkoutProgramSerializer(serializers.ModelSerializer):
         model = WorkoutProgram
         fields = ['id', 'name', 'description', 'thumbnail', 'is_active', 'phases', 'created_at']
 
+class WorkoutSetSerializer(serializers.ModelSerializer):
+    exercise_name = serializers.CharField(source='exercise.name', read_only=True)
+    class Meta:
+        model = WorkoutSet
+        fields = ['id', 'exercise', 'exercise_name', 'set_number', 'weight', 'reps', 'is_completed', 'completed_at']
+
 class UserWorkoutProgressSerializer(serializers.ModelSerializer):
     workout_title = serializers.CharField(source='workout.title', read_only=True)
+    sets = WorkoutSetSerializer(many=True, read_only=True)
 
     class Meta:
         model = UserWorkoutProgress
         fields = [
-            'id', 'user', 'workout', 'workout_title', 'completed', 'completed_date',
-            'calories_burnt', 'duration_minutes', 'notes', 'created_at'
+            'id', 'user', 'workout', 'workout_title', 'status', 'started_at', 
+            'completed', 'completed_date', 'calories_burnt', 'duration_minutes', 
+            'notes', 'sets', 'created_at'
         ]
         read_only_fields = ['id', 'created_at']

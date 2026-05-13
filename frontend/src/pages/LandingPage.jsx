@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { FiArrowRight, FiCheck, FiStar, FiPlay, FiUsers, FiAward, FiTrendingUp, FiHeart, FiZap, FiTarget } from 'react-icons/fi'
+import { FiArrowRight, FiCheck, FiStar, FiPlay, FiUsers, FiAward, FiTrendingUp, FiHeart, FiZap, FiTarget, FiClock, FiVideo } from 'react-icons/fi'
 import { useAuth } from '../context/AuthContext'
+import { subscriptionAPI } from '../services/api'
+import { motion } from 'framer-motion'
 
 const stats = [
   { value: '10K+', label: 'Students Transformed', icon: FiUsers },
@@ -25,39 +27,7 @@ const testimonials = [
   { name: 'Priya R.', role: 'Marathon finisher', text: 'The endurance programs took me from couch to completing my first marathon. The progressive training plans are brilliant.', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100', rating: 5 },
 ]
 
-const pricing = [
-  {
-    name: 'Starter',
-    price: '9.99',
-    period: '/month',
-    description: 'Perfect for beginners starting their fitness journey',
-    features: ['5 workouts/week', 'Basic nutrition guide', 'Progress tracking', 'Community access', 'Mobile app access'],
-    button: 'Start Free Trial',
-    highlight: false,
-    color: 'from-blue-500 to-cyan-500',
-  },
-  {
-    name: 'Transform',
-    price: '19.99',
-    period: '/month',
-    description: 'Most popular — complete transformation program',
-    features: ['Unlimited workouts', 'Custom meal plans', 'Personal coach access', 'Video consultations', 'Priority support', 'Advanced analytics'],
-    button: 'Get Transform',
-    highlight: true,
-    color: 'from-orange-500 to-pink-500',
-  },
-  {
-    name: 'Elite',
-    price: '29.99',
-    period: '/month',
-    description: 'For serious athletes and peak performers',
-    features: ['Everything in Transform', '1-on-1 weekly coaching', 'Custom programs', 'Nutrition consultation', 'Body composition analysis', 'Exclusive masterclasses'],
-    button: 'Go Elite',
-    highlight: false,
-    color: 'from-purple-500 to-indigo-500',
-  },
-]
-
+// Removing static pricing array
 const coaches = [
   { name: 'Alex Rivera', specialty: 'Strength & Conditioning', experience: '12 years', clients: '500+', img: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=300' },
   { name: 'Maya Chen', specialty: 'Nutrition & Weight Loss', experience: '8 years', clients: '800+', img: 'https://images.unsplash.com/photo-1594381898411-846e7d193883?w=300' },
@@ -65,13 +35,38 @@ const coaches = [
 ]
 
 const LandingPage = () => {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user, subscription } = useAuth()
   const [activeTestimonial, setActiveTestimonial] = useState(0)
+  const [tiers, setTiers] = useState([])
+  const [billingCycle, setBillingCycle] = useState('monthly')
 
   useEffect(() => {
     const timer = setInterval(() => setActiveTestimonial(p => (p + 1) % testimonials.length), 4000)
+    loadTiers()
     return () => clearInterval(timer)
   }, [])
+
+  const loadTiers = async () => {
+    try {
+      const response = await subscriptionAPI.getTiers()
+      const data = response.data.results || response.data || []
+      setTiers(Array.isArray(data) ? data : [])
+    } catch (error) {
+      console.error('Failed to load tiers:', error)
+    }
+  }
+
+  const getTierIcon = (name) => {
+    switch (name.toLowerCase()) {
+      case 'free': return <FiClock size={24} className="text-blue-400" />
+      case 'pro': return <FiStar size={24} className="text-purple-400" />
+      case 'elite': return <FiZap size={24} className="text-orange-400" />
+      default: return <FiCheck size={24} className="text-green-400" />
+    }
+  }
+
+  const currentTierName = subscription?.tier_details?.name?.toLowerCase() || 'free'
+  const currentTierIndex = tiers.findIndex(t => t.name.toLowerCase() === currentTierName)
 
   return (
     <div className="min-h-screen overflow-hidden">
@@ -109,7 +104,7 @@ const LandingPage = () => {
 
             <div className="flex flex-wrap gap-4 mb-12">
               <Link
-                to={isAuthenticated ? '/dashboard' : '/register'}
+                to={isAuthenticated ? '/dashboard' : '/onboarding'}
                 className="btn btn-primary text-lg px-8 py-4 flex items-center space-x-2"
               >
                 <span>{isAuthenticated ? 'Go to Dashboard' : 'Start Free Trial'}</span>
@@ -317,66 +312,163 @@ const LandingPage = () => {
       </section>
 
       {/* PRICING */}
-      <section className="section bg-gray-900 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-orange-500 rounded-full blur-3xl" />
+      <section className="py-32 bg-[#0f172a] relative overflow-hidden" id="pricing">
+        <div className="absolute inset-0 z-0">
+          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-orange-500/5 blur-[120px] rounded-full" />
+          <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-500/5 blur-[120px] rounded-full" />
         </div>
-        <div className="container relative z-10">
+        <div className="container relative z-10 px-4">
           <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-black text-white mb-4">
-              Simple, <span className="gradient-text">Transparent Pricing</span>
+            <div className="inline-flex items-center space-x-2 bg-orange-500/10 border border-orange-500/20 rounded-full px-4 py-2 mb-6">
+              <FiZap className="text-orange-400" />
+              <span className="text-orange-400 text-[10px] font-black uppercase tracking-widest">Select Your Protocol</span>
+            </div>
+            <h2 className="text-4xl md:text-5xl font-black text-white mb-6">
+              Elite <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-pink-600">Access</span>
             </h2>
-            <p className="text-gray-400 text-lg">No hidden fees. Cancel anytime. Start with a 7-day free trial.</p>
-          </div>
+            <p className="text-slate-500 text-lg max-w-2xl mx-auto mb-10 font-medium">
+              Choose the level of intensity your transformation requires.
+            </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {pricing.map((plan, i) => (
-              <div
-                key={i}
-                className={`relative rounded-3xl p-8 transition-all duration-300 hover:-translate-y-2 ${
-                  plan.highlight
-                    ? 'bg-gradient-to-br from-orange-500 to-pink-600 shadow-2xl shadow-orange-500/30 scale-105'
-                    : 'bg-gray-800 border border-gray-700 hover:border-orange-500/50'
-                }`}
-              >
-                {plan.highlight && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-white text-orange-600 px-6 py-1 rounded-full text-sm font-black shadow-lg">
-                    MOST POPULAR
-                  </div>
-                )}
-
-                <h3 className={`text-2xl font-black mb-2 ${plan.highlight ? 'text-white' : 'text-white'}`}>{plan.name}</h3>
-                <p className={`text-sm mb-6 ${plan.highlight ? 'text-white/80' : 'text-gray-400'}`}>{plan.description}</p>
-
-                <div className="mb-8">
-                  <span className={`text-5xl font-black ${plan.highlight ? 'text-white' : 'text-orange-400'}`}>${plan.price}</span>
-                  <span className={`${plan.highlight ? 'text-white/70' : 'text-gray-500'}`}>{plan.period}</span>
-                </div>
-
-                <Link
-                  to={isAuthenticated ? '/payment' : '/register'}
-                  state={isAuthenticated ? { plan } : undefined}
-                  className={`w-full btn mb-8 block text-center ${
-                    plan.highlight
-                      ? 'bg-white text-orange-600 hover:bg-gray-100'
-                      : 'btn-primary'
+            {/* Billing Toggle */}
+            <div className="inline-flex items-center p-1 bg-slate-900 border border-slate-800 rounded-2xl">
+              {['monthly', 'quarterly', 'yearly'].map((cycle) => (
+                <button
+                  key={cycle}
+                  onClick={() => setBillingCycle(cycle)}
+                  className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                    billingCycle === cycle
+                      ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20'
+                      : 'text-slate-500 hover:text-slate-300'
                   }`}
                 >
-                  {plan.button}
-                </Link>
+                  {cycle}
+                </button>
+              ))}
+            </div>
+          </div>
 
-                <ul className="space-y-3">
-                  {plan.features.map((feature, fi) => (
-                    <li key={fi} className="flex items-center space-x-3">
-                      <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${plan.highlight ? 'bg-white/20' : 'bg-orange-500/20'}`}>
-                        <FiCheck className={`${plan.highlight ? 'text-white' : 'text-orange-400'}`} size={12} />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
+            {tiers.map((tier, idx) => {
+              const plan = tier.plans.find(p => p.billing_cycle === billingCycle)
+              const isFree = tier.name.toLowerCase() === 'free'
+              const isPopular = tier.name.toLowerCase() === 'pro'
+              const isCurrent = tier.name.toLowerCase() === currentTierName
+              
+              let buttonText = 'Subscribe'
+              let buttonLink = isAuthenticated ? '/payment' : '/register'
+              
+              let isIncluded = false
+              if (isAuthenticated) {
+                if (isCurrent) {
+                  buttonText = 'Current Plan'
+                  buttonLink = '/dashboard'
+                } else if (idx > currentTierIndex) {
+                  buttonText = 'Upgrade'
+                } else if (idx < currentTierIndex) {
+                  buttonText = 'Included'
+                  isIncluded = true
+                  buttonLink = '/dashboard'
+                }
+              } else {
+                if (isFree) {
+                  buttonText = 'Initialize'
+                } else {
+                  buttonText = 'Subscribe'
+                }
+              }
+              
+              return (
+                <div
+                  key={tier.id}
+                  className={`relative rounded-[2.5rem] p-8 transition-all duration-500 group ${
+                    isPopular
+                      ? 'bg-slate-900 border-2 border-orange-500 shadow-2xl shadow-orange-500/10'
+                      : 'bg-slate-900/50 backdrop-blur-xl border border-slate-800/50 hover:border-orange-500/30'
+                  }`}
+                >
+                  {isPopular && (
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-orange-500 text-white px-6 py-1 rounded-full text-[10px] font-black tracking-widest">
+                      MOST POPULAR
+                    </div>
+                  )}
+
+                  <div className="flex items-center space-x-4 mb-8">
+                    <div className="w-14 h-14 rounded-2xl bg-slate-800/50 flex items-center justify-center border border-slate-700/50 shadow-inner group-hover:bg-orange-500/10 transition-colors duration-500">
+                      {getTierIcon(tier.name)}
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-black text-white tracking-tight uppercase">{tier.name}</h3>
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Tier {idx + 1}</span>
+                    </div>
+                  </div>
+
+                  <div className="mb-10">
+                    {isFree ? (
+                      <div className="flex flex-col">
+                        <span className="text-5xl font-black text-white">FREE</span>
+                        <span className="text-blue-400 text-[10px] font-black uppercase tracking-widest mt-2 flex items-center gap-2">
+                          <FiVideo size={14} /> AD-SUPPORTED
+                        </span>
                       </div>
-                      <span className={`text-sm ${plan.highlight ? 'text-white/90' : 'text-gray-300'}`}>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+                    ) : (
+                      <div>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-5xl font-black text-white">
+                            ${plan ? plan.price : '—'}
+                          </span>
+                          <span className="text-slate-500 text-xs font-black uppercase tracking-widest">
+                            /{billingCycle === 'monthly' ? 'mo' : billingCycle === 'quarterly' ? '3mo' : 'yr'}
+                          </span>
+                        </div>
+                        <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-2">Billed {billingCycle}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {isCurrent || isIncluded ? (
+                    <div className="w-full py-5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] text-center block transition-all bg-green-500/20 text-green-400 border border-green-500/30">
+                      {buttonText}
+                    </div>
+                  ) : (
+                    <Link
+                      to={buttonLink}
+                      state={!isFree && plan ? { plan } : undefined}
+                      className={`w-full py-5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] text-center block transition-all ${
+                        isFree 
+                          ? 'bg-slate-800 text-white hover:bg-slate-700'
+                          : isPopular
+                            ? 'bg-gradient-to-r from-orange-500 to-pink-600 text-white shadow-xl shadow-orange-500/20 hover:scale-[1.02]'
+                            : 'bg-white text-slate-900 hover:bg-slate-100'
+                      }`}
+                    >
+                      {buttonText}
+                    </Link>
+                  )}
+
+                  <div className="mt-10 pt-8 border-t border-slate-800/50">
+                    <p className="text-slate-500 text-[10px] uppercase font-black tracking-widest mb-6">Inclusions</p>
+                    <ul className="space-y-4">
+                      {tier.features.map((feature, i) => {
+                        const isNo = feature.startsWith('❌')
+                        const text = feature.replace(/^[✅❌]\s*/, '')
+                        return (
+                          <li key={i} className={`flex items-start space-x-3 ${isNo ? 'opacity-30' : ''}`}>
+                            {isNo
+                              ? <span className="text-red-500 mt-1 flex-shrink-0 text-xs">✗</span>
+                              : <FiCheck className="text-orange-500 mt-1 flex-shrink-0" size={14} />
+                            }
+                            <span className={`text-xs font-bold leading-relaxed ${isNo ? 'text-slate-600 line-through' : 'text-slate-300'}`}>
+                              {text}
+                            </span>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       </section>

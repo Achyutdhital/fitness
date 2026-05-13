@@ -4,7 +4,8 @@ from .models import (
     BodyMeasurement, Achievement, UserAchievement, UserPoints,
     Challenge, ChallengeParticipation, Notification,
     Coupon, Referral, SupportTicket,
-    AdViewLog, ItemUnlock, CustomizedWorkout, CustomizedMealPlan, CoachSession
+    AdViewLog, ItemUnlock, CustomizedWorkout, CustomizedMealPlan, CoachSession,
+    AIChatMessage, TrainerMessage, TrainerMessageQuota, AIUsage
 )
 
 class WorkoutFavoriteSerializer(serializers.ModelSerializer):
@@ -117,8 +118,26 @@ class ReferralSerializer(serializers.ModelSerializer):
 class SupportTicketSerializer(serializers.ModelSerializer):
     class Meta:
         model = SupportTicket
-        fields = ['id', 'name', 'email', 'subject', 'message', 'status', 'priority', 'created_at']
-        read_only_fields = ['id', 'status', 'priority', 'created_at']
+        fields = ['id', 'name', 'email', 'subject', 'message', 'category', 'status', 'priority', 'created_at', 'triaged_at']
+        read_only_fields = ['id', 'category', 'status', 'priority', 'created_at', 'triaged_at']
+
+
+class SupportTicketAdminSerializer(serializers.ModelSerializer):
+    requester_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SupportTicket
+        fields = [
+            'id', 'user', 'requester_name', 'name', 'email', 'subject', 'message',
+            'category', 'status', 'priority', 'admin_notes', 'created_at', 'updated_at', 'triaged_at'
+        ]
+        read_only_fields = ['id', 'user', 'requester_name', 'created_at', 'updated_at', 'triaged_at']
+
+    def get_requester_name(self, obj):
+        if obj.user:
+            full_name = obj.user.get_full_name().strip()
+            return full_name or obj.user.username
+        return obj.name
 
 class AdViewLogSerializer(serializers.ModelSerializer):
     class Meta:
@@ -147,7 +166,37 @@ class CustomizedMealPlanSerializer(serializers.ModelSerializer):
 class CoachSessionSerializer(serializers.ModelSerializer):
     client_name = serializers.CharField(source='client.get_full_name', read_only=True)
     coach_name = serializers.CharField(source='coach.get_full_name', read_only=True)
+    requested_by_name = serializers.CharField(source='requested_by.get_full_name', read_only=True)
 
     class Meta:
         model = CoachSession
         fields = '__all__'
+        read_only_fields = ['client', 'coach', 'requested_by', 'status', 'meeting_link']
+
+
+class AIChatMessageSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+    
+    class Meta:
+        model = AIChatMessage
+        fields = ['id', 'user', 'username', 'role', 'text', 'timestamp']
+        read_only_fields = ['id', 'user', 'timestamp']
+
+
+class TrainerMessageSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    coach_name = serializers.CharField(source='coach.get_full_name', read_only=True)
+    
+    class Meta:
+        model = TrainerMessage
+        fields = ['id', 'user', 'user_name', 'coach', 'coach_name', 'text', 'role', 'timestamp', 'is_ai_generated']
+        read_only_fields = ['id', 'user', 'timestamp']
+
+
+class TrainerMessageQuotaSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+    
+    class Meta:
+        model = TrainerMessageQuota
+        fields = ['id', 'user', 'username', 'week_start_date', 'messages_this_week', 'weekly_limit', 'month_start_date', 'messages_this_month', 'monthly_limit', 'last_updated']
+        read_only_fields = ['id', 'user', 'week_start_date', 'month_start_date', 'last_updated']

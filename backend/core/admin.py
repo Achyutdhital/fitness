@@ -4,8 +4,14 @@ from .models import (
     BodyMeasurement, Achievement, UserAchievement, UserPoints,
     Challenge, ChallengeParticipation, Notification,
     Coupon, Referral, SupportTicket,
+    EmailAutomationLog,
 )
 
+from .feature_flags import FeatureFlag
+from .analytics_models import (
+    ChurnPrediction, EngagementScore, LifetimeValue,
+    CohortAnalysis, RetentionMetrics, CustomerAcquisitionCost
+)
 
 @admin.register(Achievement)
 class AchievementAdmin(admin.ModelAdmin):
@@ -57,9 +63,10 @@ class ReferralAdmin(admin.ModelAdmin):
 
 @admin.register(SupportTicket)
 class SupportTicketAdmin(admin.ModelAdmin):
-    list_display = ['subject', 'name', 'email', 'status', 'priority', 'created_at']
-    list_filter = ['status', 'priority']
-    search_fields = ['subject', 'name', 'email']
+    list_display = ['subject', 'name', 'email', 'category', 'status', 'priority', 'triaged_at', 'created_at']
+    list_filter = ['category', 'status', 'priority']
+    search_fields = ['subject', 'name', 'email', 'message', 'admin_notes']
+    readonly_fields = ['triaged_at', 'created_at', 'updated_at']
 
 
 @admin.register(Notification)
@@ -67,6 +74,13 @@ class NotificationAdmin(admin.ModelAdmin):
     list_display = ['user', 'title', 'notification_type', 'is_read', 'created_at']
     list_filter = ['notification_type', 'is_read']
     search_fields = ['user__username', 'title']
+
+
+@admin.register(EmailAutomationLog)
+class EmailAutomationLogAdmin(admin.ModelAdmin):
+    list_display = ['automation_key', 'recipient_email', 'reference_date', 'created_at']
+    list_filter = ['automation_key', 'reference_date']
+    search_fields = ['recipient_email', 'recipient_name', 'automation_key']
 
 
 @admin.register(BodyMeasurement)
@@ -85,3 +99,59 @@ class WorkoutReviewAdmin(admin.ModelAdmin):
 
 admin.site.register(WorkoutFavorite)
 admin.site.register(MealPlanFavorite)
+
+
+# ============================================================================
+# Phase 9: Feature Flags and Analytics Admin
+# ============================================================================
+
+@admin.register(FeatureFlag)
+class FeatureFlagAdmin(admin.ModelAdmin):
+    list_display = ['key', 'name', 'type', 'is_active', 'percentage_rollout', 'created_at']
+    list_filter = ['type', 'is_active']
+    search_fields = ['key', 'name']
+    ordering = ['-created_at']
+
+
+@admin.register(ChurnPrediction)
+class ChurnPredictionAdmin(admin.ModelAdmin):
+    list_display = ['user', 'churn_risk_score', 'is_at_risk', 'days_inactive']
+    list_filter = ['is_at_risk']
+    search_fields = ['user__username']
+    ordering = ['-churn_risk_score']
+
+
+@admin.register(EngagementScore)
+class EngagementScoreAdmin(admin.ModelAdmin):
+    list_display = ['user', 'score', 'workouts_week', 'score_trend']
+    list_filter = ['score_trend']
+    search_fields = ['user__username']
+    ordering = ['-score']
+
+
+@admin.register(LifetimeValue)
+class LifetimeValueAdmin(admin.ModelAdmin):
+    list_display = ['user', 'total_revenue', 'average_revenue_per_month', 'predicted_ltv']
+    search_fields = ['user__username']
+    ordering = ['-predicted_ltv']
+
+
+@admin.register(CohortAnalysis)
+class CohortAnalysisAdmin(admin.ModelAdmin):
+    list_display = ['cohort_month', 'cohort_size', 'month_0_active', 'avg_ltv', 'total_revenue']
+    list_filter = ['cohort_month']
+    ordering = ['-cohort_month']
+
+
+@admin.register(RetentionMetrics)
+class RetentionMetricsAdmin(admin.ModelAdmin):
+    list_display = ['date', 'active_users', 'day_1_retention', 'day_7_retention', 'day_30_retention']
+    list_filter = ['date']
+    ordering = ['-date']
+
+
+@admin.register(CustomerAcquisitionCost)
+class CustomerAcquisitionCostAdmin(admin.ModelAdmin):
+    list_display = ['month', 'new_customers', 'total_marketing_spend', 'cac_per_customer']
+    list_filter = ['month']
+    ordering = ['-month']

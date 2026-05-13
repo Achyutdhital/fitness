@@ -1,4 +1,4 @@
-Django==4.2.11
+﻿django==4.2.11
 djangorestframework==3.14.0
 djangorestframework-simplejwt==5.2.2
 django-cors-headers==4.0.0
@@ -9,10 +9,12 @@ PyJWT==2.12.1
 Pillow==10.0.0
 celery==5.3.1
 redis==5.0.0
+django-redis==5.4.0
+pywin32==310; platform_system == 'Windows'
 python-dateutil==2.8.2
 gunicorn==21.2.0
 psycopg2-binary==2.9.11
 drf-spectacular==0.26.2
 django-filter==23.2
 google-genai>=1.0.0
-
+sentry-sdk==1.44.0

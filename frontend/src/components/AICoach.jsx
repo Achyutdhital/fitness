@@ -7,25 +7,40 @@ import {
   FiChevronDown, FiCpu
 } from 'react-icons/fi'
 
+const GENERAL_TIER = {
+  label: 'AI Coach',
+  locked: false,
+  color: 'text-blue-400',
+  badge: 'General Tips',
+  badgeColor: 'bg-blue-500/20 text-blue-300',
+  placeholder: 'Ask about workouts, nutrition, recovery, or your progress...',
+  starters: [
+    'What should I focus on this week?',
+    'How do I improve recovery after training?',
+    'Suggest a better warm-up for my workout.',
+  ],
+}
+
+const ELITE_TIER = {
+  label: 'Elite AI Coach',
+  locked: false,
+  color: 'text-orange-400',
+  badge: 'Full Coaching',
+  badgeColor: 'bg-orange-500/20 text-orange-300',
+  placeholder: 'Ask anything — form, periodisation, recovery...',
+  starters: [
+    'Review my last week and suggest adjustments',
+    'Design my recovery protocol for this week',
+    'What should my nutrition timing look like today?',
+  ],
+}
+
 const TIER_CONFIG = {
   free: {
     label: 'AI Coach',
     locked: true,
     color: 'text-gray-400',
     badge: null,
-  },
-  basic: {
-    label: 'AI Coach',
-    locked: false,
-    color: 'text-blue-400',
-    badge: 'General Tips',
-    badgeColor: 'bg-blue-500/20 text-blue-300',
-    placeholder: 'Ask about workouts, nutrition, tips...',
-    starters: [
-      'How many rest days per week?',
-      'What should I eat before a workout?',
-      'How do I improve my push-up form?',
-    ],
   },
   pro: {
     label: 'AI Coach Pro',
@@ -40,19 +55,8 @@ const TIER_CONFIG = {
       'How do I break through a plateau?',
     ],
   },
-  elite: {
-    label: 'Elite AI Coach',
-    locked: false,
-    color: 'text-orange-400',
-    badge: 'Full Coaching',
-    badgeColor: 'bg-orange-500/20 text-orange-300',
-    placeholder: 'Ask anything — form, periodisation, recovery...',
-    starters: [
-      'Review my last week and suggest adjustments',
-      'Design my recovery protocol for this week',
-      'What should my nutrition timing look like today?',
-    ],
-  },
+  elite: ELITE_TIER,
+  custom: ELITE_TIER,
 }
 
 const AICoach = () => {
@@ -60,12 +64,29 @@ const AICoach = () => {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [quota, setQuota] = useState(null)
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
 
   const { user, subscription } = useAuth()
   const tier = subscription?.tier_details?.name?.toLowerCase() || 'free'
-  const config = TIER_CONFIG[tier] || TIER_CONFIG.free
+  const normalizedTier = tier
+  const config = TIER_CONFIG[normalizedTier] || TIER_CONFIG.free
+
+  // Load quota when widget opens
+  useEffect(() => {
+    if (open && !config.locked) {
+      const fetchQuota = async () => {
+        try {
+          const res = await aiAPI.getQuota()
+          setQuota(res.data.quota)
+        } catch (err) {
+          console.error("Failed to load quota", err)
+        }
+      }
+      fetchQuota()
+    }
+  }, [open, config.locked])
 
   // Load persistent history on mount
   useEffect(() => {
@@ -88,14 +109,12 @@ const AICoach = () => {
     if (open && !config.locked && messages.length === 0) {
       setMessages([{
         role: 'assistant',
-        text: tier === 'basic'
-          ? "Hi! I'm your FitCoachAI assistant. I can give you general fitness tips, nutrition basics, and workout guidance. What would you like to know?"
-          : tier === 'pro'
+        text: normalizedTier === 'pro'
           ? "Hey! I'm your personalised Pro AI Coach. I know your program and goals — ask me anything about adjustments, nutrition, or your progress."
           : "Welcome! I'm your dedicated Elite AI Coach. I have full context on your training, body data, and history. Ask me anything — no question is too specific.",
       }])
     }
-  }, [open, tier, config.locked])
+  }, [open, normalizedTier, config.locked])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -121,8 +140,12 @@ const AICoach = () => {
       // Backend now handles history from the database
       const res = await aiAPI.chat(msg)
       setMessages(prev => [...prev, { role: 'assistant', text: res.data.reply }])
+      // Update quota after message
+      if (res.data.quota) {
+        setQuota(res.data.quota)
+      }
     } catch (err) {
-      const errMsg = err.response?.data?.reply || err.response?.data?.message || 'Something went wrong. Please try again.'
+      const errMsg = err.response?.data?.message || err.response?.data?.reply || 'Something went wrong. Please try again.'
       setMessages(prev => [...prev, { role: 'assistant', text: errMsg, isError: true }])
     } finally {
       setLoading(false)
@@ -146,9 +169,9 @@ const AICoach = () => {
             ? 'bg-gray-800 border border-gray-600 rotate-0'
             : config.locked
             ? 'bg-gray-800 border border-gray-700 hover:border-gray-500'
-            : tier === 'elite'
+            : normalizedTier === 'elite'
             ? 'bg-gradient-to-br from-orange-500 to-pink-600 shadow-orange-500/30'
-            : tier === 'pro'
+            : normalizedTier === 'pro'
             ? 'bg-gradient-to-br from-purple-500 to-indigo-600 shadow-purple-500/30'
             : 'bg-gradient-to-br from-blue-500 to-cyan-600 shadow-blue-500/30'
         }`}
@@ -172,15 +195,15 @@ const AICoach = () => {
 
           {/* Header */}
           <div className={`px-5 py-4 flex items-center justify-between border-b border-gray-800 ${
-            tier === 'elite' ? 'bg-gradient-to-r from-orange-600/20 to-pink-600/10' :
-            tier === 'pro' ? 'bg-gradient-to-r from-purple-600/20 to-indigo-600/10' :
+            normalizedTier === 'elite' ? 'bg-gradient-to-r from-orange-600/20 to-pink-600/10' :
+            normalizedTier === 'pro' ? 'bg-gradient-to-r from-purple-600/20 to-indigo-600/10' :
             'bg-gray-800/50'
           }`}>
             <div className="flex items-center space-x-3">
               <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
                 config.locked ? 'bg-gray-700' :
-                tier === 'elite' ? 'bg-orange-500/20' :
-                tier === 'pro' ? 'bg-purple-500/20' : 'bg-blue-500/20'
+                normalizedTier === 'elite' ? 'bg-orange-500/20' :
+                normalizedTier === 'pro' ? 'bg-purple-500/20' : 'bg-blue-500/20'
               }`}>
                 <FiCpu className={config.color} size={18} />
               </div>
@@ -206,7 +229,7 @@ const AICoach = () => {
               </div>
               <h3 className="text-white font-black text-lg mb-2">AI Coach Locked</h3>
               <p className="text-gray-500 text-sm mb-6 leading-relaxed">
-                Get general fitness tips with <strong className="text-white">Basic</strong>, personalised coaching with <strong className="text-white">Pro</strong>, and full coaching with <strong className="text-white">Elite</strong>.
+                Unlock AI coaching with <strong className="text-white">Pro</strong> for personalised guidance, or <strong className="text-white">Elite</strong> for full context coaching.
               </p>
               <Link
                 to="/subscriptions"
@@ -224,8 +247,8 @@ const AICoach = () => {
                   <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     {msg.role === 'assistant' && (
                       <div className={`w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 mr-2 mt-1 ${
-                        tier === 'elite' ? 'bg-orange-500/20' :
-                        tier === 'pro' ? 'bg-purple-500/20' : 'bg-blue-500/20'
+                        normalizedTier === 'elite' ? 'bg-orange-500/20' :
+                        normalizedTier === 'pro' ? 'bg-purple-500/20' : 'bg-blue-500/20'
                       }`}>
                         <FiCpu className={config.color} size={13} />
                       </div>
@@ -245,7 +268,7 @@ const AICoach = () => {
                 {loading && (
                   <div className="flex justify-start">
                     <div className={`w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 mr-2 mt-1 ${
-                      tier === 'elite' ? 'bg-orange-500/20' : tier === 'pro' ? 'bg-purple-500/20' : 'bg-blue-500/20'
+                      normalizedTier === 'elite' ? 'bg-orange-500/20' : normalizedTier === 'pro' ? 'bg-purple-500/20' : 'bg-blue-500/20'
                     }`}>
                       <FiCpu className={config.color} size={13} />
                     </div>
@@ -271,6 +294,30 @@ const AICoach = () => {
                       {s}
                     </button>
                   ))}
+                </div>
+              )}
+
+              {/* Quota Display */}
+              {quota && (
+                <div className="px-4 py-2 border-t border-gray-800 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs text-gray-400">
+                    <span className="flex items-center gap-1">
+                      <FiZap size={12} /> Daily: {quota.daily_remaining}/{quota.daily_limit}
+                    </span>
+                    <span className="text-gray-600">
+                      Monthly: {quota.monthly_remaining}/{quota.monthly_limit}
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full transition-all ${
+                        quota.daily_remaining <= 0 ? 'bg-red-500' :
+                        quota.daily_remaining <= 2 ? 'bg-yellow-500' :
+                        'bg-green-500'
+                      }`}
+                      style={{ width: `${(quota.daily_limit - quota.daily_remaining) / quota.daily_limit * 100}%` }}
+                    />
+                  </div>
                 </div>
               )}
 

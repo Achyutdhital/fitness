@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { authAPI, paymentAPI } from '../services/api'
-import { FiUser, FiMail, FiLock, FiSave, FiCreditCard, FiCalendar, FiTrendingUp, FiTarget, FiActivity, FiAward } from 'react-icons/fi'
+import { 
+  FiUser, FiMail, FiLock, FiSave, FiCreditCard, 
+  FiCalendar, FiTrendingUp, FiTarget, FiActivity, 
+  FiAward, FiZap, FiChevronRight, FiCheck
+} from 'react-icons/fi'
+import { motion, AnimatePresence } from 'framer-motion'
 
 const ProfilePage = () => {
   const { user, subscription, updateProfile, fetchUser } = useAuth()
@@ -35,7 +40,7 @@ const ProfilePage = () => {
         first_name: user.first_name || '',
         last_name: user.last_name || '',
         email: user.email || '',
-        phone: user.phone || '',
+        phone: user.phone || user.phone_number || '',
         date_of_birth: user.date_of_birth || '',
         gender: user.gender || '',
         height: user.height || '',
@@ -61,7 +66,8 @@ const ProfilePage = () => {
   const loadPayments = async () => {
     try {
       const response = await paymentAPI.getPayments()
-      setPayments(response.data.results || response.data || [])
+      const pData = response.data.results || response.data || []
+      setPayments(Array.isArray(pData) ? pData : [])
     } catch (error) {
       console.error('Failed to load payments:', error)
     }
@@ -76,13 +82,13 @@ const ProfilePage = () => {
       const result = await updateProfile(profileData)
       if (result.success) {
         await authAPI.updateProfileDetails({ goals: profileDetails.goals })
-        setMessage({ type: 'success', text: 'Profile updated successfully!' })
+        setMessage({ type: 'success', text: 'Protocol parameters updated successfully.' })
         await fetchUser()
       } else {
         setMessage({ type: 'error', text: result.error || 'Update failed' })
       }
     } catch (error) {
-      setMessage({ type: 'error', text: 'An error occurred' })
+      setMessage({ type: 'error', text: 'An unexpected transmission error occurred.' })
     } finally {
       setLoading(false)
     }
@@ -91,7 +97,7 @@ const ProfilePage = () => {
   const handlePasswordChange = async (e) => {
     e.preventDefault()
     if (passwordData.new_password !== passwordData.confirm_password) {
-      setMessage({ type: 'error', text: 'Passwords do not match' })
+      setMessage({ type: 'error', text: 'Security tokens do not match.' })
       return
     }
 
@@ -103,270 +109,349 @@ const ProfilePage = () => {
         old_password: passwordData.old_password,
         new_password: passwordData.new_password,
       })
-      setMessage({ type: 'success', text: 'Password changed successfully!' })
+      setMessage({ type: 'success', text: 'Security credentials updated successfully.' })
       setPasswordData({ old_password: '', new_password: '', confirm_password: '' })
     } catch (error) {
-      setMessage({ type: 'error', text: error.response?.data?.detail || 'Password change failed' })
+      setMessage({ type: 'error', text: error.response?.data?.detail || 'Credential update failed' })
     } finally {
       setLoading(false)
     }
   }
 
   const stats = [
-    { label: 'Current Weight', value: `${user?.weight || 0} kg`, icon: FiTrendingUp, color: 'from-blue-500 to-cyan-500' },
-    { label: 'Height', value: `${user?.height || 0} cm`, icon: FiActivity, color: 'from-green-500 to-teal-500' },
+    { label: 'Current Weight', value: `${user?.weight || '--'} kg`, icon: FiTrendingUp, color: 'from-blue-500 to-cyan-500' },
+    { label: 'Height', value: `${user?.height || '--'} cm`, icon: FiActivity, color: 'from-green-500 to-teal-500' },
     { label: 'Fitness Level', value: user?.fitness_level || 'Not set', icon: FiTarget, color: 'from-orange-500 to-pink-500' },
-    { label: 'Member Since', value: user?.date_joined ? new Date(user.date_joined).toLocaleDateString() : 'N/A', icon: FiAward, color: 'from-purple-500 to-indigo-500' },
+    { label: 'Member Since', value: user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A', icon: FiAward, color: 'from-purple-500 to-indigo-500' },
   ]
 
+  const containerVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 py-12">
-      <div className="container">
+    <div className="min-h-screen bg-[#0f172a] py-12 relative overflow-hidden">
+      {/* Background Decor */}
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-orange-500/5 blur-[120px] -z-10 rounded-full" />
+      <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-500/5 blur-[120px] -z-10 rounded-full" />
+
+      <div className="container mx-auto px-4">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-black text-white mb-2">My Profile</h1>
-          <p className="text-gray-400">Manage your account settings and preferences</p>
+        <div className="mb-12">
+          <h1 className="text-5xl font-black text-white mb-2 tracking-tight">Athlete <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-pink-600">Profile</span></h1>
+          <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Manage your elite credentials and performance parameters</p>
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           {stats.map((stat, i) => (
-            <div key={i} className="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-700">
-              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center mb-4`}>
-                <stat.icon className="text-white" size={24} />
+            <motion.div 
+              key={i}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+              className="bg-slate-900/50 backdrop-blur-xl rounded-[2rem] p-6 border border-slate-800/50"
+            >
+              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center mb-6 shadow-lg`}>
+                <stat.icon className="text-white" size={20} />
               </div>
-              <p className="text-gray-400 text-sm mb-1">{stat.label}</p>
-              <p className="text-white text-2xl font-bold">{stat.value}</p>
-            </div>
+              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">{stat.label}</p>
+              <p className="text-white text-2xl font-black tracking-tight">{stat.value}</p>
+            </motion.div>
           ))}
         </div>
 
         {/* Tabs */}
-        <div className="flex space-x-2 mb-6 overflow-x-auto">
+        <div className="flex space-x-2 mb-8 bg-slate-900/50 p-1 rounded-2xl w-fit border border-slate-800/50">
           {[
-            { id: 'profile', label: 'Profile Info', icon: FiUser },
-            { id: 'subscription', label: 'Subscription', icon: FiCreditCard },
+            { id: 'profile', label: 'Identity', icon: FiUser },
+            { id: 'subscription', label: 'Protocol', icon: FiCreditCard },
             { id: 'security', label: 'Security', icon: FiLock },
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-semibold transition-all ${
+              className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${
                 activeTab === tab.id
-                  ? 'bg-gradient-to-r from-orange-500 to-pink-500 text-white shadow-lg'
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20'
+                  : 'text-slate-500 hover:text-slate-300'
               }`}
             >
-              <tab.icon size={18} />
+              <tab.icon size={14} />
               <span>{tab.label}</span>
             </button>
           ))}
         </div>
 
-        {/* Message */}
-        {message.text && (
-          <div className={`mb-6 p-4 rounded-xl ${message.type === 'success' ? 'bg-green-500/20 border border-green-500/50 text-green-400' : 'bg-red-500/20 border border-red-500/50 text-red-400'}`}>
-            {message.text}
-          </div>
-        )}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Content Area */}
+          <motion.div 
+            key={activeTab}
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="lg:col-span-2 bg-slate-900/50 backdrop-blur-xl rounded-[2.5rem] p-8 md:p-12 border border-slate-800/50"
+          >
+            <AnimatePresence mode="wait">
+              {message.text && (
+                <motion.div 
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className={`mb-8 p-4 rounded-2xl flex items-center gap-3 font-bold text-xs ${
+                    message.type === 'success' 
+                    ? 'bg-green-500/10 border border-green-500/20 text-green-400' 
+                    : 'bg-red-500/10 border border-red-500/20 text-red-400'
+                  }`}
+                >
+                  {message.type === 'success' ? <FiCheck /> : <FiZap />}
+                  <p>{message.text}</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-        {/* Content */}
-        <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-8 border border-gray-700">
-          {activeTab === 'profile' && (
-            <form onSubmit={handleProfileUpdate} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-gray-300 font-medium mb-2">First Name</label>
-                  <input
-                    type="text"
-                    value={profileData.first_name}
-                    onChange={(e) => setProfileData({ ...profileData, first_name: e.target.value })}
-                    className="input-field bg-gray-900 text-white border-gray-700"
-                  />
+            {activeTab === 'profile' && (
+              <form onSubmit={handleProfileUpdate} className="space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-4">First Name</label>
+                    <input
+                      type="text"
+                      value={profileData.first_name}
+                      onChange={(e) => setProfileData({ ...profileData, first_name: e.target.value })}
+                      className="w-full bg-slate-800/50 border border-slate-700/50 rounded-2xl py-4 px-6 text-white text-sm focus:outline-none focus:border-orange-500/50 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-4">Last Name</label>
+                    <input
+                      type="text"
+                      value={profileData.last_name}
+                      onChange={(e) => setProfileData({ ...profileData, last_name: e.target.value })}
+                      className="w-full bg-slate-800/50 border border-slate-700/50 rounded-2xl py-4 px-6 text-white text-sm focus:outline-none focus:border-orange-500/50 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-4">Communication (Email)</label>
+                    <input
+                      type="email"
+                      value={profileData.email}
+                      onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+                      className="w-full bg-slate-800/50 border border-slate-700/50 rounded-2xl py-4 px-6 text-white text-sm focus:outline-none focus:border-orange-500/50 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-4">Direct Link (Phone)</label>
+                    <input
+                      type="tel"
+                      value={profileData.phone}
+                      onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
+                      className="w-full bg-slate-800/50 border border-slate-700/50 rounded-2xl py-4 px-6 text-white text-sm focus:outline-none focus:border-orange-500/50 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-4">Bio-Metrics (Height/Weight)</label>
+                    <div className="flex gap-4">
+                      <input
+                        type="number"
+                        placeholder="cm"
+                        value={profileData.height}
+                        onChange={(e) => setProfileData({ ...profileData, height: e.target.value })}
+                        className="w-1/2 bg-slate-800/50 border border-slate-700/50 rounded-2xl py-4 px-6 text-white text-sm focus:outline-none focus:border-orange-500/50 transition-all"
+                      />
+                      <input
+                        type="number"
+                        placeholder="kg"
+                        value={profileData.weight}
+                        onChange={(e) => setProfileData({ ...profileData, weight: e.target.value })}
+                        className="w-1/2 bg-slate-800/50 border border-slate-700/50 rounded-2xl py-4 px-6 text-white text-sm focus:outline-none focus:border-orange-500/50 transition-all"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-4">Experience Level</label>
+                    <select
+                      value={profileData.fitness_level}
+                      onChange={(e) => setProfileData({ ...profileData, fitness_level: e.target.value })}
+                      className="w-full bg-slate-800/50 border border-slate-700/50 rounded-2xl py-4 px-6 text-white text-sm focus:outline-none focus:border-orange-500/50 transition-all appearance-none"
+                    >
+                      <option value="beginner">Beginner</option>
+                      <option value="intermediate">Intermediate</option>
+                      <option value="advanced">Advanced</option>
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-gray-300 font-medium mb-2">Last Name</label>
-                  <input
-                    type="text"
-                    value={profileData.last_name}
-                    onChange={(e) => setProfileData({ ...profileData, last_name: e.target.value })}
-                    className="input-field bg-gray-900 text-white border-gray-700"
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-300 font-medium mb-2">Email</label>
-                  <input
-                    type="email"
-                    value={profileData.email}
-                    onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                    className="input-field bg-gray-900 text-white border-gray-700"
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-300 font-medium mb-2">Phone</label>
-                  <input
-                    type="tel"
-                    value={profileData.phone}
-                    onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
-                    className="input-field bg-gray-900 text-white border-gray-700"
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-300 font-medium mb-2">Date of Birth</label>
-                  <input
-                    type="date"
-                    value={profileData.date_of_birth}
-                    onChange={(e) => setProfileData({ ...profileData, date_of_birth: e.target.value })}
-                    className="input-field bg-gray-900 text-white border-gray-700"
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-300 font-medium mb-2">Gender</label>
-                  <select
-                    value={profileData.gender}
-                    onChange={(e) => setProfileData({ ...profileData, gender: e.target.value })}
-                    className="input-field bg-gray-900 text-white border-gray-700"
-                  >
-                    <option value="">Select</option>
-                    <option value="M">Male</option>
-                    <option value="F">Female</option>
-                    <option value="O">Other</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-gray-300 font-medium mb-2">Height (cm)</label>
-                  <input
-                    type="number"
-                    value={profileData.height}
-                    onChange={(e) => setProfileData({ ...profileData, height: e.target.value })}
-                    className="input-field bg-gray-900 text-white border-gray-700"
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-300 font-medium mb-2">Weight (kg)</label>
-                  <input
-                    type="number"
-                    value={profileData.weight}
-                    onChange={(e) => setProfileData({ ...profileData, weight: e.target.value })}
-                    className="input-field bg-gray-900 text-white border-gray-700"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                   <label className="block text-gray-300 font-medium mb-2">Fitness Level</label>
-                   <select
-                     value={profileData.fitness_level}
-                     onChange={(e) => setProfileData({ ...profileData, fitness_level: e.target.value })}
-                     className="input-field bg-gray-900 text-white border-gray-700"
-                   >
-                     <option value="beginner">Beginner</option>
-                     <option value="intermediate">Intermediate</option>
-                     <option value="advanced">Advanced</option>
-                   </select>
-                 </div>
-                 <div className="md:col-span-2">
-                   <label className="block text-gray-300 font-medium mb-2">Primary Fitness Goal</label>
+
+                <div className="space-y-2">
+                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-4">Core Fitness Objectives</label>
                    <textarea
                      value={profileDetails.goals}
                      onChange={(e) => setProfileDetails({ ...profileDetails, goals: e.target.value })}
-                     className="input-field bg-gray-900 text-white border-gray-700 min-h-24"
-                     placeholder="Describe your goal (fat loss, strength, endurance, etc.)"
+                     className="w-full bg-slate-800/50 border border-slate-700/50 rounded-2xl py-4 px-6 text-white text-sm focus:outline-none focus:border-orange-500/50 transition-all min-h-[120px] resize-none"
+                     placeholder="Describe your ultimate physical transformation goal..."
                    />
-                 </div>
-               </div>
-
-              <button type="submit" disabled={loading} className="btn btn-primary flex items-center space-x-2">
-                <FiSave />
-                <span>{loading ? 'Saving...' : 'Save Changes'}</span>
-              </button>
-            </form>
-          )}
-
-          {activeTab === 'subscription' && (
-            <div className="space-y-6">
-              <div className="bg-gradient-to-r from-orange-500 to-pink-500 rounded-2xl p-6 text-white">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <p className="text-white/80 text-sm">Current Plan</p>
-                    <h3 className="text-3xl font-black">{subscription?.subscription_plan?.name || 'Free Trial'}</h3>
-                  </div>
-                  <FiCreditCard size={40} className="text-white/50" />
                 </div>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-white/70">Status</p>
-                    <p className="font-bold">{subscription?.status || 'Active'}</p>
-                  </div>
-                  <div>
-                    <p className="text-white/70">Renews On</p>
-                    <p className="font-bold">{subscription?.end_date ? new Date(subscription.end_date).toLocaleDateString() : 'N/A'}</p>
+
+                <button type="submit" disabled={loading} className="px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-orange-500/20 flex items-center gap-3">
+                  <FiSave />
+                  <span>{loading ? 'Processing...' : 'Synchronize Profile'}</span>
+                </button>
+              </form>
+            )}
+
+            {activeTab === 'subscription' && (
+              <div className="space-y-12">
+                <div className="bg-gradient-to-r from-orange-500 to-pink-600 rounded-[2rem] p-10 text-white relative overflow-hidden group">
+                  <FiZap className="absolute top-0 right-0 text-white/10 -mr-8 -mt-8 group-hover:scale-110 transition-transform duration-700" size={240} />
+                  <div className="relative z-10">
+                    <p className="text-white/70 text-[10px] font-black uppercase tracking-widest mb-2">Current Active Protocol</p>
+                    <h3 className="text-5xl font-black mb-8 tracking-tight">{subscription?.tier_details?.name || 'Free Tier'}</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+                       <div>
+                         <p className="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1">Status</p>
+                         <p className="font-bold text-sm">{subscription?.status?.toUpperCase() || 'ACTIVE'}</p>
+                       </div>
+                       <div>
+                         <p className="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1">Renew Date</p>
+                         <p className="font-bold text-sm">{subscription?.end_date ? new Date(subscription.end_date).toLocaleDateString() : 'INDIVIDUAL UNLOCKS'}</p>
+                       </div>
+                       <div>
+                         <p className="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1">Sessions</p>
+                         <p className="font-bold text-sm">{subscription?.tier_details?.sessions_per_week || 0} / Week</p>
+                       </div>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div>
-                <h3 className="text-white font-bold text-xl mb-4">Payment History</h3>
-                {payments.length > 0 ? (
-                  <div className="space-y-3">
-                    {payments.slice(0, 5).map((payment) => (
-                      <div key={payment.id} className="bg-gray-900 rounded-xl p-4 flex items-center justify-between border border-gray-700">
-                        <div>
-                          <p className="text-white font-medium">${payment.amount}</p>
-                          <p className="text-gray-400 text-sm">{new Date(payment.created_at).toLocaleDateString()}</p>
+                <div>
+                  <h3 className="text-2xl font-black text-white mb-6">Execution Log (Billing)</h3>
+                  {payments.length > 0 ? (
+                    <div className="space-y-4">
+                      {payments.map((payment) => (
+                        <div key={payment.id} className="flex items-center justify-between p-6 bg-slate-800/30 rounded-2xl border border-slate-700/30">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-orange-500">
+                               <FiCreditCard />
+                            </div>
+                            <div>
+                               <p className="text-white font-bold text-sm">${payment.amount}</p>
+                               <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">{new Date(payment.created_at).toLocaleDateString()}</p>
+                            </div>
+                          </div>
+                          <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${payment.status === 'completed' ? 'bg-green-500/10 text-green-400' : 'bg-yellow-500/10 text-yellow-400'}`}>
+                            {payment.status}
+                          </span>
                         </div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${payment.status === 'completed' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
-                          {payment.status}
-                        </span>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-12 text-center bg-slate-800/20 rounded-3xl border border-slate-800 border-dashed">
+                       <p className="text-slate-600 font-bold text-sm italic">No transaction records found in protocol.</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-4">
+                   <button className="px-8 py-4 bg-white text-slate-900 rounded-2xl font-black uppercase tracking-widest text-xs transition-all hover:bg-slate-100 shadow-xl">Upgrade Protocol</button>
+                   <button className="px-8 py-4 bg-slate-800 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all hover:bg-slate-700 border border-slate-700">Cancel Cycle</button>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'security' && (
+              <form onSubmit={handlePasswordChange} className="space-y-8 max-w-md">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-4">Current Access Token</label>
+                  <div className="relative group">
+                    <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500 transition-colors" />
+                    <input
+                      type="password"
+                      value={passwordData.old_password}
+                      onChange={(e) => setPasswordData({ ...passwordData, old_password: e.target.value })}
+                      className="w-full bg-slate-800/50 border border-slate-700/50 rounded-2xl py-4 pl-12 pr-4 text-white text-sm focus:outline-none focus:border-orange-500/50 transition-all"
+                      required
+                    />
                   </div>
-                ) : (
-                  <p className="text-gray-400">No payment history yet</p>
-                )}
-              </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-4">New Access Token</label>
+                  <div className="relative group">
+                    <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500 transition-colors" />
+                    <input
+                      type="password"
+                      value={passwordData.new_password}
+                      onChange={(e) => setPasswordData({ ...passwordData, new_password: e.target.value })}
+                      className="w-full bg-slate-800/50 border border-slate-700/50 rounded-2xl py-4 pl-12 pr-4 text-white text-sm focus:outline-none focus:border-orange-500/50 transition-all"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-4">Confirm Token</label>
+                  <div className="relative group">
+                    <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500 transition-colors" />
+                    <input
+                      type="password"
+                      value={passwordData.confirm_password}
+                      onChange={(e) => setPasswordData({ ...passwordData, confirm_password: e.target.value })}
+                      className="w-full bg-slate-800/50 border border-slate-700/50 rounded-2xl py-4 pl-12 pr-4 text-white text-sm focus:outline-none focus:border-orange-500/50 transition-all"
+                      required
+                    />
+                  </div>
+                </div>
 
-              <button className="btn btn-primary">Upgrade Plan</button>
-            </div>
-          )}
+                <button type="submit" disabled={loading} className="w-full px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-orange-500/20 flex items-center justify-center gap-3">
+                  <FiLock />
+                  <span>{loading ? 'Updating...' : 'Regenerate Security'}</span>
+                </button>
+              </form>
+            )}
+          </motion.div>
 
-          {activeTab === 'security' && (
-            <form onSubmit={handlePasswordChange} className="space-y-6">
-              <div>
-                <label className="block text-gray-300 font-medium mb-2">Current Password</label>
-                <input
-                  type="password"
-                  value={passwordData.old_password}
-                  onChange={(e) => setPasswordData({ ...passwordData, old_password: e.target.value })}
-                  className="input-field bg-gray-900 text-white border-gray-700"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-gray-300 font-medium mb-2">New Password</label>
-                <input
-                  type="password"
-                  value={passwordData.new_password}
-                  onChange={(e) => setPasswordData({ ...passwordData, new_password: e.target.value })}
-                  className="input-field bg-gray-900 text-white border-gray-700"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-gray-300 font-medium mb-2">Confirm New Password</label>
-                <input
-                  type="password"
-                  value={passwordData.confirm_password}
-                  onChange={(e) => setPasswordData({ ...passwordData, confirm_password: e.target.value })}
-                  className="input-field bg-gray-900 text-white border-gray-700"
-                  required
-                />
-              </div>
+          {/* Sidebar / Profile Summary */}
+          <div className="space-y-8">
+             <div className="bg-slate-900/50 backdrop-blur-xl rounded-[2.5rem] p-8 border border-slate-800/50 text-center">
+                <div className="relative w-32 h-32 mx-auto mb-6">
+                   <div className="absolute inset-0 bg-gradient-to-br from-orange-500 to-pink-600 rounded-full animate-pulse blur-lg opacity-20" />
+                   <img 
+                    src={user?.profile_image || `https://ui-avatars.com/api/?name=${user?.username}&background=f97316&color=fff&size=128`} 
+                    className="w-full h-full object-cover rounded-full border-4 border-slate-800 relative z-10" 
+                    alt="Profile"
+                   />
+                </div>
+                <h3 className="text-2xl font-black text-white mb-1 tracking-tight">{user?.first_name} {user?.last_name}</h3>
+                <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-6">@{user?.username}</p>
+                <div className="flex justify-center gap-2">
+                   <span className="px-3 py-1 bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-lg text-[10px] font-black uppercase tracking-widest">
+                     {user?.role || 'Member'}
+                   </span>
+                </div>
+             </div>
 
-              <button type="submit" disabled={loading} className="btn btn-primary flex items-center space-x-2">
-                <FiLock />
-                <span>{loading ? 'Changing...' : 'Change Password'}</span>
-              </button>
-            </form>
-          )}
+             <div className="bg-slate-900/50 backdrop-blur-xl rounded-[2.5rem] p-8 border border-slate-800/50">
+                <h4 className="text-white font-black text-xs uppercase tracking-widest mb-6 flex items-center gap-2">
+                   <FiZap className="text-orange-500" />
+                   <span>Elite Status</span>
+                </h4>
+                <div className="space-y-4">
+                   <div className="flex justify-between items-center text-xs font-bold">
+                      <span className="text-slate-500 uppercase tracking-widest">Global Rank</span>
+                      <span className="text-white">Top 1%</span>
+                   </div>
+                   <div className="flex justify-between items-center text-xs font-bold">
+                      <span className="text-slate-500 uppercase tracking-widest">Total Points</span>
+                      <span className="text-orange-400 font-black">{user?.points?.total_points || 0} XP</span>
+                   </div>
+                   <div className="flex justify-between items-center text-xs font-bold">
+                      <span className="text-slate-500 uppercase tracking-widest">Verified Status</span>
+                      <span className={user?.is_verified ? 'text-green-400' : 'text-slate-600'}>
+                        {user?.is_verified ? 'COMPLIANT' : 'PENDING'}
+                      </span>
+                   </div>
+                </div>
+             </div>
+          </div>
         </div>
       </div>
     </div>

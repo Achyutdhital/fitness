@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { workoutAPI, authAPI, coreAPI } from '../services/api'
+import { workoutAPI, authAPI, coreAPI, aiAPI } from '../services/api'
 import { 
   FiTrendingUp, FiActivity, FiTarget, FiAward, 
   FiCalendar, FiZap, FiHeart, FiClock, 
@@ -24,6 +24,9 @@ const DashboardPage = () => {
   const [recommendations, setRecommendations] = useState([])
   const [aiBriefing, setAiBriefing] = useState("")
   const [leaderboard, setLeaderboard] = useState([])
+  const [analysisData, setAnalysisData] = useState(null)
+  const [liveWorkout, setLiveWorkout] = useState(null)
+  const [aiQuota, setAiQuota] = useState(null)
   
   useEffect(() => {
     loadDashboardData()
@@ -37,11 +40,44 @@ const DashboardPage = () => {
     }
   }, [stats])
 
+  const activeWorkout = useMemo(() => {
+    return todayWorkout?.workout || stats?.recent_workouts?.[0]?.workout || recommendations[0] || null
+  }, [todayWorkout, stats, recommendations])
+
+  const dashboardInsights = useMemo(() => {
+    if (!stats) return []
+
+    const completedWorkouts = stats.completed_workouts || 0
+    const totalDurationMinutes = stats.total_duration_minutes || 0
+    const streakDays = stats.streak || 0
+    const weeklyActivity = stats.weekly_activity || []
+    const activeDays = weeklyActivity.filter((day) => day.done).length
+    const averageSession = completedWorkouts ? Math.round(totalDurationMinutes / completedWorkouts) : 0
+    const lastWorkoutTitle = stats?.recent_workouts?.[0]?.workout?.title
+
+    return [
+      streakDays >= 3
+        ? `You have a ${streakDays}-day streak. Keep the same cadence and protect recovery.`
+        : 'Build a 3-day streak before chasing more volume.',
+      lastWorkoutTitle
+        ? `Continue where you left off with ${lastWorkoutTitle}. Add 1 set or 2 reps on the main lift.`
+        : 'Complete your first tracked workout so progression can start adapting automatically.',
+      totalDurationMinutes >= 180
+        ? `You trained for about ${Math.round(totalDurationMinutes / 60)} hours. A mobility or zone-2 day would balance the load.`
+        : `You have ${activeDays} active training days this week. Aim for one more quality session.`,
+      averageSession
+        ? `Average session length is ${averageSession} minutes. Use that to keep your weekly workload consistent.`
+        : 'Log a few completed workouts to unlock deeper AI guidance.',
+    ]
+  }, [stats])
+
   const loadDashboardData = async () => {
     try {
-      const [statsRes, todayRes] = await Promise.allSettled([
+      const [statsRes, todayRes, analysisRes, progressRes] = await Promise.allSettled([
         authAPI.getDashboardStats(),
-        workoutAPI.getTodayWorkout()
+        workoutAPI.getTodayWorkout(),
+        aiAPI.analyzeAndSuggest(),
+        workoutAPI.getProgress()
       ])
 
       if (statsRes.status === 'fulfilled') {
@@ -50,6 +86,20 @@ const DashboardPage = () => {
 
       if (todayRes.status === 'fulfilled') {
         setTodayWorkout(todayRes.value.data)
+      }
+
+      if (analysisRes.status === 'fulfilled') {
+        setAnalysisData(analysisRes.value.data)
+      }
+
+      const quotaRes = await aiAPI.getQuota().catch(() => null)
+      if (quotaRes?.data?.quota) {
+        setAiQuota(quotaRes.data.quota)
+      }
+
+      if (progressRes.status === 'fulfilled') {
+        const active = progressRes.value.data.find(p => p.status === 'in_progress')
+        setLiveWorkout(active)
       }
 
       const recRes = await workoutAPI.getWorkouts({ limit: 3 })
@@ -123,6 +173,15 @@ const DashboardPage = () => {
     { label: 'Day Streak', value: stats?.streak || 0, icon: FiAward, color: 'from-purple-500 to-indigo-500', change: 'Personal best!' },
   ]
 
+  const detailCards = [
+    { label: 'Average Session', value: stats?.completed_workouts ? `${Math.round((stats?.total_duration_minutes || 0) / stats.completed_workouts)} min` : '--', icon: FiClock, color: 'from-slate-500 to-slate-600' },
+    { label: 'Active Days', value: stats?.weekly_activity?.filter((day) => day.done)?.length || 0, icon: FiCalendar, color: 'from-blue-500 to-indigo-500' },
+    { label: 'Achievements', value: stats?.achievements_count || 0, icon: FiAward, color: 'from-pink-500 to-rose-500' },
+    { label: 'Unread Alerts', value: stats?.unread_notifications || 0, icon: FiVideo, color: 'from-amber-500 to-orange-500' },
+  ]
+
+  const insightCards = stats?.insight_cards || []
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#0f172a]">
@@ -150,6 +209,133 @@ const DashboardPage = () => {
         animate="visible"
         className="container mx-auto px-4"
       >
+        {/* Live Tracking & Advanced Analysis */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-12">
+          {/* Live Workout Status */}
+          <motion.div 
+            variants={itemVariants}
+            className="xl:col-span-1"
+          >
+            {liveWorkout ? (
+              <div className="bg-orange-500 rounded-[2.5rem] p-8 text-white relative overflow-hidden h-full shadow-2xl shadow-orange-500/40">
+                <div className="absolute -right-4 -top-4 w-32 h-32 bg-white/10 rounded-full blur-3xl animate-pulse" />
+                <div className="relative z-10">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center animate-bounce">
+                      <FiActivity size={24} />
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-[0.3em]">Session Active</span>
+                  </div>
+                  <h3 className="text-3xl font-black mb-2">{liveWorkout.workout_title}</h3>
+                  <p className="text-white/80 text-xs font-bold mb-8 uppercase tracking-widest">Started at {new Date(liveWorkout.started_at).toLocaleTimeString()}</p>
+                  
+                  <Link 
+                    to={`/workouts/${liveWorkout.workout}`}
+                    className="w-full py-4 bg-white text-orange-500 rounded-xl font-black text-xs uppercase tracking-[0.2em] transition-all block text-center hover:scale-[1.02]"
+                  >
+                    Resume Performance log
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-slate-900/50 backdrop-blur-xl rounded-[2.5rem] p-8 border border-slate-800/50 h-full flex flex-col justify-center items-center text-center">
+                <FiClock size={40} className="text-slate-700 mb-4" />
+                <p className="text-slate-500 text-xs font-black uppercase tracking-widest">No active session</p>
+                <p className="text-slate-600 text-[10px] mt-2">Start your protocol to begin live tracking</p>
+              </div>
+            )}
+          </motion.div>
+
+          {/* ML Analysis Engine */}
+          <motion.div 
+            variants={itemVariants}
+            className="xl:col-span-2 bg-gradient-to-br from-slate-900 to-[#1e293b] rounded-[2.5rem] p-8 border border-white/5 relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 p-8 text-blue-500/5 -mr-8 -mt-8">
+              <FiTrendingUp size={200} />
+            </div>
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-8">
+                <div>
+                  <h2 className="text-2xl font-black text-white">Advanced Analysis Engine</h2>
+                  <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Personalized Performance Recommendations</p>
+                </div>
+                  <div className="px-4 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-[10px] font-black uppercase tracking-widest">
+                Active Guidance
+                </div>
+              </div>
+
+              {analysisData ? (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-2">Internal Diagnostics</p>
+                    {analysisData.analysis.map((item, i) => (
+                      <div key={i} className="flex items-center gap-3 text-white text-sm font-bold">
+                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="p-6 rounded-[2rem] bg-white/5 border border-white/10">
+                    <p className="text-orange-400 text-[10px] font-black uppercase tracking-widest mb-3">Suggested Solution</p>
+                    <p className="text-white text-base font-bold leading-relaxed mb-4">
+                      "{analysisData.suggested_solution}"
+                    </p>
+                    <div className="grid grid-cols-2 gap-3 mb-4">
+                      <div className="rounded-2xl bg-blue-500/10 border border-blue-500/20 p-3">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-blue-300 mb-1">Readiness Score</p>
+                        <p className="text-white text-xl font-black">{analysisData.model_score}/100</p>
+                      </div>
+                      <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-3">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-300 mb-1">Signal Strength</p>
+                        <p className="text-white text-xl font-black">{Math.round((analysisData.model_confidence || 0) * 100)}%</p>
+                      </div>
+                    </div>
+                    {analysisData.training_samples && (
+                      <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-3">
+                        Calibrated from {analysisData.training_samples.toLocaleString()} reference samples
+                      </p>
+                    )}
+                    {analysisData.supporting_signals?.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {analysisData.supporting_signals.map((signal) => (
+                          <span key={signal} className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-slate-300 text-[10px] font-black uppercase tracking-widest">
+                            {signal}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="pt-4 border-t border-white/5">
+                      <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">Next Protocol Action</p>
+                      <p className="text-blue-400 text-xs font-black uppercase tracking-widest">{analysisData.next_step}</p>
+                      {stats?.next_best_action && (
+                        <p className="text-slate-400 text-xs mt-2 leading-relaxed">{stats.next_best_action}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                  {insightCards.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {insightCards.map((card) => (
+                        <div key={card.label} className="bg-white/5 backdrop-blur rounded-2xl p-4 border border-white/5">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">{card.label}</p>
+                          <p className="text-white text-2xl font-black mb-1">{card.value}</p>
+                          <p className="text-slate-400 text-xs leading-relaxed">{card.detail}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="py-12 text-center text-slate-500">
+                  Initializing analysis engine... Complete at least one measurement and workout to unlock insights.
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </div>
+
         {/* Elite AI Briefing */}
         <motion.div 
           variants={itemVariants}
@@ -165,12 +351,67 @@ const DashboardPage = () => {
                 "{aiBriefing}"
               </p>
             </div>
-            <Link to="/ai-coach" className="px-6 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all border border-white/10 flex items-center gap-2">
-              <span>Detailed Analysis</span>
-              <FiChevronRight />
-            </Link>
+            {isFreeTier ? (
+              <Link to="/subscriptions" className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-orange-500/20 flex items-center gap-2">
+                <span>Unlock Basic Protocol</span>
+                <FiZap />
+              </Link>
+            ) : (
+              <Link to="/coaching" className="px-6 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all border border-white/10 flex items-center gap-2">
+                <span>1-on-1 Coaching</span>
+                <FiChevronRight />
+              </Link>
+            )}
           </div>
         </motion.div>
+
+        {aiQuota && (
+          <motion.div
+            variants={itemVariants}
+            className="mb-12 grid gap-4 md:grid-cols-3"
+          >
+            <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-5 md:col-span-2">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.25em] text-orange-400 font-black">AI Coach Quota</p>
+                  <h3 className="text-white text-lg font-black">Messages remaining today</h3>
+                </div>
+                <FiZap className="text-orange-400" size={20} />
+              </div>
+              <div className="flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-4xl font-black text-white">
+                    {aiQuota.daily_remaining}
+                    <span className="text-slate-500 text-lg font-bold"> / {aiQuota.daily_limit}</span>
+                  </p>
+                  <p className="text-slate-400 text-sm mt-1">
+                    Monthly: {aiQuota.monthly_remaining} / {aiQuota.monthly_limit} remaining
+                  </p>
+                </div>
+                <Link
+                  to="/subscriptions"
+                  className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-widest transition-all"
+                >
+                  Upgrade
+                </Link>
+              </div>
+              <div className="mt-4 h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-orange-500 to-pink-500 transition-all"
+                  style={{ width: `${Math.min(100, ((aiQuota.daily_limit - aiQuota.daily_remaining) / aiQuota.daily_limit) * 100)}%` }}
+                />
+              </div>
+            </div>
+            <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-5 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.25em] text-slate-500 font-black">Reset</p>
+                <p className="text-white font-bold mt-1">Daily at midnight UTC</p>
+                <p className="text-slate-400 text-sm mt-1">Monthly resets on the 1st</p>
+              </div>
+              <FiClock className="text-slate-500" size={20} />
+            </div>
+          </motion.div>
+        )}
 
         {/* Welcome Header */}
         <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -189,6 +430,15 @@ const DashboardPage = () => {
             </div>
           </div>
           <div className="flex gap-4">
+             {isFreeTier && (
+               <button 
+                onClick={() => setIsAdModalOpen(true)}
+                className="px-6 py-4 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center gap-3"
+               >
+                  <FiVideo />
+                  <span>Earn Points</span>
+               </button>
+             )}
              <Link to="/workouts" className="px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-black uppercase tracking-widest transition-all shadow-xl shadow-orange-500/20 flex items-center gap-3">
                 <FiZap />
                 <span>Start Training</span>
@@ -218,6 +468,95 @@ const DashboardPage = () => {
               <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">{stat.label}</p>
             </motion.div>
           ))}
+        </div>
+
+        {/* Detailed Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-12">
+          {detailCards.map((card, i) => (
+            <motion.div
+              key={i}
+              variants={itemVariants}
+              className="bg-slate-900/40 backdrop-blur-xl rounded-[1.75rem] p-6 border border-slate-800/50"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${card.color} flex items-center justify-center text-white`}>
+                  <card.icon size={18} />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Live metric</span>
+              </div>
+              <p className="text-3xl font-black text-white tracking-tight">{card.value}</p>
+              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">{card.label}</p>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Resume + AI Insights */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+          <motion.div variants={itemVariants} className="bg-slate-900/50 backdrop-blur-xl rounded-[2.5rem] p-8 border border-slate-800/50">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-black text-white">Continue Where You Left Off</h2>
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Resume the next best session</p>
+              </div>
+              <FiArrowRight className="text-orange-400" />
+            </div>
+
+            {activeWorkout ? (
+              <div className="space-y-6">
+                <div className="p-5 rounded-2xl bg-slate-800/40 border border-slate-700/50">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-orange-400 mb-2">
+                    {todayWorkout?.workout ? 'Today\'s Session' : 'Recommended Next'}
+                  </p>
+                  <h3 className="text-2xl font-black text-white mb-2">{activeWorkout.title}</h3>
+                  <p className="text-slate-500 text-sm leading-relaxed">
+                    {activeWorkout.description || 'Pick up from your last completed effort and push the next progression step.'}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="rounded-2xl bg-blue-500/10 border border-blue-500/20 p-4">
+                    <p className="text-blue-300 text-[10px] font-black uppercase tracking-widest mb-1">Total Workouts</p>
+                    <p className="text-white text-2xl font-black">{stats?.completed_workouts || 0}</p>
+                  </div>
+                  <div className="rounded-2xl bg-green-500/10 border border-green-500/20 p-4">
+                    <p className="text-green-300 text-[10px] font-black uppercase tracking-widest mb-1">Total Time</p>
+                    <p className="text-white text-2xl font-black">{Math.round((stats?.total_duration_minutes || 0) / 60)}h</p>
+                  </div>
+                </div>
+
+                <Link
+                  to={`/workouts/${activeWorkout.id}`}
+                  className="inline-flex items-center gap-2 px-6 py-4 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-orange-500/20"
+                >
+                  <span>{todayWorkout?.workout ? 'Commence Session' : 'Resume Plan'}</span>
+                  <FiChevronRight />
+                </Link>
+              </div>
+            ) : (
+              <div className="text-slate-500 text-sm">No workout is available to resume yet. Start a session from the workout library.</div>
+            )}
+          </motion.div>
+
+          <motion.div variants={itemVariants} className="bg-slate-900/50 backdrop-blur-xl rounded-[2.5rem] p-8 border border-slate-800/50">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-black text-white">AI Overview</h2>
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Auto-generated from your training history</p>
+              </div>
+              <FiZap className="text-orange-400" />
+            </div>
+
+            <div className="space-y-4">
+              {dashboardInsights.map((insight, i) => (
+                <div key={i} className="flex items-start gap-3 rounded-2xl bg-slate-800/40 border border-slate-700/40 p-4">
+                  <div className="w-7 h-7 rounded-lg bg-orange-500/20 text-orange-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <FiCheck size={14} />
+                  </div>
+                  <p className="text-slate-300 text-sm leading-relaxed">{insight}</p>
+                </div>
+              ))}
+            </div>
+          </motion.div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">

@@ -52,6 +52,8 @@ export const authAPI = {
   getProfileDetails: () => api.get('/auth/user/profile/'),
   updateProfileDetails: (data) => api.post('/auth/user/update_profile_details/', data),
   getDashboardStats: () => api.get('/auth/user/dashboard_stats/'),
+  calculateBodyMetrics: (data) => api.post('/auth/user/calculate_body_metrics/', data),
+  getBodyMetrics: () => api.get('/auth/user/body_metrics/'),
   requestPasswordReset: (email) => api.post('/auth/password-reset/', { email }),
   confirmPasswordReset: (uid, token, new_password, confirm_password) =>
     api.post('/auth/password-reset/confirm/', { uid, token, new_password, confirm_password }),
@@ -84,7 +86,9 @@ export const workoutAPI = {
   deleteCategory: (id) => api.delete(`/workouts/categories/${id}/`),
   getMyWorkouts: () => api.get('/workouts/workouts/my_workouts/'),
   getFeaturedWorkouts: () => api.get('/workouts/workouts/featured/'),
-  markWorkoutComplete: (id, data) => api.post(`/workouts/workouts/${id}/mark_complete/`),
+  markWorkoutComplete: (id, data) => api.post(`/workouts/workouts/${id}/mark_complete/`, data),
+  startWorkout: (id) => api.post(`/workouts/workouts/${id}/start_workout/`),
+  logSet: (id, data) => api.post(`/workouts/workouts/${id}/log_set/`, data),
   getProgress: () => api.get('/workouts/progress/my_progress/'),
   getStats: () => api.get('/workouts/progress/stats/'),
   getMealPlans: (params) => api.get('/workouts/meal-plans/', { params }),
@@ -99,8 +103,24 @@ export const workoutAPI = {
 
 // Payment APIs
 export const paymentAPI = {
-  createPaymentIntent: (planId, couponCode = '') => api.post('/payments/payments/create_payment_intent/', { plan_id: planId, coupon_code: couponCode }),
-  confirmPayment: (paymentIntentId, planId) => api.post('/payments/payments/confirm_payment/', { payment_intent_id: paymentIntentId, plan_id: planId }),
+  createPaymentIntent: (planOrPayload, couponCode = '') => {
+    if (planOrPayload && typeof planOrPayload === 'object' && !Array.isArray(planOrPayload)) {
+      const payload = { ...planOrPayload }
+      if (couponCode && !payload.coupon_code) {
+        payload.coupon_code = couponCode
+      }
+      return api.post('/payments/payments/create_payment_intent/', payload)
+    }
+
+    return api.post('/payments/payments/create_payment_intent/', { plan_id: planOrPayload, coupon_code: couponCode })
+  },
+  confirmPayment: (paymentIntentId, planOrPayload) => {
+    if (planOrPayload && typeof planOrPayload === 'object' && !Array.isArray(planOrPayload)) {
+      return api.post('/payments/payments/confirm_payment/', { payment_intent_id: paymentIntentId, ...planOrPayload })
+    }
+
+    return api.post('/payments/payments/confirm_payment/', { payment_intent_id: paymentIntentId, plan_id: planOrPayload })
+  },
   getPayments: () => api.get('/payments/payments/my_payments/'),
   cancelSubscription: () => api.post('/payments/payments/cancel_subscription/', {}),
   requestRefund: (paymentId, reason) => api.post('/payments/payments/create_refund/', { payment_id: paymentId, reason }),
@@ -141,6 +161,12 @@ export const coreAPI = {
   markAllRead: () => api.post('/core/notifications/mark_all_read/'),
   markRead: (notification_id) => api.post('/core/notifications/mark_read/', { notification_id }),
 
+  // Coaching Sessions
+  getSessions: () => api.get('/core/sessions/'),
+  createSession: (data) => api.post('/core/sessions/', data),
+  respondSession: (id, data) => api.post(`/core/sessions/${id}/respond/`, data),
+  cancelSession: (id) => api.post(`/core/sessions/${id}/cancel/`),
+
   // Coupons
   validateCoupon: (code, plan_id) => api.post('/core/coupons/validate/', { code, plan_id }),
 
@@ -150,6 +176,8 @@ export const coreAPI = {
   // Support
   submitTicket: (data) => api.post('/core/support/submit/', data),
   getMyTickets: () => api.get('/core/support/my_tickets/'),
+  getSupportTickets: () => api.get('/core/support/'),
+  updateSupportTicket: (id, data) => api.patch(`/core/support/${id}/`, data),
 
   // Ads & Unlocks
   logAdView: () => api.post('/core/ads/log_ad_view/'),
@@ -157,6 +185,7 @@ export const coreAPI = {
 
   // Coach Management
   getCoachClients: () => api.get('/core/coach/get_coach_clients/'),
+  getCoachPayoutSummary: () => api.get('/core/coach/payout_summary/'),
   customizeWorkout: (clientId, data) => api.post(`/core/coach/${clientId}/customize_workout/`, data),
 
   // Reminders
@@ -240,5 +269,7 @@ export const adminAPI = {
 export const aiAPI = {
   chat: (message) => api.post('/core/ai/chat/', { message }),
   getHistory: () => api.get('/core/ai/history/'),
+  getQuota: () => api.get('/core/ai/quota/'),
+  analyzeAndSuggest: () => api.get('/core/ai/analyze_and_suggest/'),
 }
 

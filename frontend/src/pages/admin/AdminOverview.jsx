@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { 
   FiUsers, FiDollarSign, FiActivity, FiTrendingUp, 
   FiArrowRight, FiUserPlus, FiZap, FiCalendar,
-  FiFileText, FiTarget, FiBarChart2, FiAward
+  FiFileText, FiTarget, FiBarChart2, FiAward, FiMessageSquare
 } from 'react-icons/fi'
 import SEO from '../../components/SEO'
 
@@ -62,7 +62,7 @@ const AdminOverview = () => {
       { label: 'Total Users', value: stats.total_users || 0, icon: FiUsers, color: 'from-blue-500 to-cyan-500', sub: `+${stats.new_users_this_month || 0} this month` },
       { label: 'Active Subscriptions', value: stats.active_subscriptions || 0, icon: FiZap, color: 'from-orange-500 to-pink-500', sub: 'Currently active' },
       { label: 'Total Revenue', value: `$${Number(stats.total_revenue || 0).toFixed(2)}`, icon: FiDollarSign, color: 'from-green-500 to-teal-500', sub: 'All time' },
-      { label: 'Workouts Completed', value: stats.total_workouts_completed || 0, icon: FiActivity, color: 'from-purple-500 to-indigo-500', sub: 'By all users' },
+      { label: 'Open Support Tickets', value: stats.open_support_tickets || 0, icon: FiMessageSquare, color: 'from-purple-500 to-indigo-500', sub: `${stats.urgent_support_tickets || 0} urgent · ${stats.resolved_support_tickets || 0} resolved` },
     ]
   }
 
@@ -87,7 +87,7 @@ const AdminOverview = () => {
       { to: '/admin/blog', label: 'Write Blog Post', icon: FiArrowRight, color: 'from-blue-500 to-cyan-500' },
       { to: '/admin/subscriptions', label: 'Manage Plans', icon: FiDollarSign, color: 'from-purple-500 to-indigo-500' },
       { to: '/admin/users', label: 'View Users', icon: FiUsers, color: 'from-yellow-500 to-orange-500' },
-      { to: '/admin/messages', label: 'View Messages', icon: FiUserPlus, color: 'from-pink-500 to-rose-500' },
+      { to: '/admin/messages', label: 'Support Inbox', icon: FiMessageSquare, color: 'from-pink-500 to-rose-500' },
     ]
   }
 

@@ -15,11 +15,20 @@ const ChallengesPage = () => {
 
   const loadData = async () => {
     try {
-      const [c, m] = await Promise.all([coreAPI.getChallenges(), coreAPI.getMyChallenges()])
-      setChallenges(c.data)
-      setMyChallenges(m.data)
+      const [c, m] = await Promise.allSettled([
+        coreAPI.getChallenges(), 
+        coreAPI.getMyChallenges()
+      ])
+      
+      const challengesData = c.status === 'fulfilled' ? (c.value.data?.results || c.value.data || []) : []
+      const mineData = m.status === 'fulfilled' ? (m.value.data?.results || m.value.data || []) : []
+
+      setChallenges(Array.isArray(challengesData) ? challengesData : [])
+      setMyChallenges(Array.isArray(mineData) ? mineData : [])
     } catch (e) {
       console.error(e)
+      setChallenges([])
+      setMyChallenges([])
     } finally {
       setLoading(false)
     }

@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react'
 import api, { coreAPI } from '../services/api'
-import { FiUsers, FiCalendar, FiEdit3, FiActivity, FiSearch, FiVideo } from 'react-icons/fi'
+import { FiUsers, FiCalendar, FiEdit3, FiActivity, FiSearch, FiVideo, FiDollarSign } from 'react-icons/fi'
 
 const CoachDashboard = () => {
   const [clients, setClients] = useState([])
   const [sessions, setSessions] = useState([])
+  const [payoutSummary, setPayoutSummary] = useState(null)
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [scheduleForm, setScheduleForm] = useState({ client_id: '', scheduled_at: '', duration_minutes: 30 })
 
   useEffect(() => {
     loadDashboardData()
@@ -21,6 +23,10 @@ const CoachDashboard = () => {
       ])
       setClients(clientsRes.data)
       setSessions(sessionsRes.data)
+      const payoutRes = await coreAPI.getCoachPayoutSummary().catch(() => null)
+      if (payoutRes?.data) {
+        setPayoutSummary(payoutRes.data)
+      }
     } catch (error) {
       console.error('Failed to load coach data:', error)
     } finally {
@@ -33,6 +39,29 @@ const CoachDashboard = () => {
     const roomName = `FitCoachPro-Session-${clientId}-${Date.now()}`
     const meetingUrl = `https://meet.jit.si/${roomName}`
     window.open(meetingUrl, '_blank')
+  }
+
+  const scheduleSession = async (e) => {
+    e.preventDefault()
+    if (!scheduleForm.client_id || !scheduleForm.scheduled_at) return
+    try {
+      await coreAPI.createSession(scheduleForm)
+      setScheduleForm({ client_id: '', scheduled_at: '', duration_minutes: 30 })
+      await loadDashboardData()
+    } catch (error) {
+      console.error('Failed to schedule session', error)
+      alert(error?.response?.data?.error || 'Failed to schedule session')
+    }
+  }
+
+  const respondToSession = async (sessionId, decision) => {
+    try {
+      await coreAPI.respondSession(sessionId, { decision })
+      await loadDashboardData()
+    } catch (error) {
+      console.error('Failed to update session', error)
+      alert(error?.response?.data?.error || 'Failed to update session')
+    }
   }
 
   const filteredClients = clients.filter(c => 
@@ -99,6 +128,38 @@ const CoachDashboard = () => {
             <span className="text-4xl font-black text-white">0</span>
           </div>
         </div>
+
+        {payoutSummary && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            <div className="bg-gray-800/50 p-6 rounded-3xl border border-gray-700">
+              <div className="flex items-center space-x-4 mb-4">
+                <div className="w-12 h-12 rounded-2xl bg-yellow-500/20 flex items-center justify-center text-yellow-400">
+                  <FiDollarSign size={24} />
+                </div>
+                <span className="text-gray-400 font-bold uppercase tracking-widest text-xs">Payouts Pending</span>
+              </div>
+              <span className="text-4xl font-black text-white">${Number(payoutSummary.summary.pending_total || 0).toFixed(2)}</span>
+            </div>
+            <div className="bg-gray-800/50 p-6 rounded-3xl border border-gray-700">
+              <div className="flex items-center space-x-4 mb-4">
+                <div className="w-12 h-12 rounded-2xl bg-green-500/20 flex items-center justify-center text-green-400">
+                  <FiDollarSign size={24} />
+                </div>
+                <span className="text-gray-400 font-bold uppercase tracking-widest text-xs">Payouts Paid</span>
+              </div>
+              <span className="text-4xl font-black text-white">${Number(payoutSummary.summary.paid_total || 0).toFixed(2)}</span>
+            </div>
+            <div className="bg-gray-800/50 p-6 rounded-3xl border border-gray-700">
+              <div className="flex items-center space-x-4 mb-4">
+                <div className="w-12 h-12 rounded-2xl bg-blue-500/20 flex items-center justify-center text-blue-400">
+                  <FiDollarSign size={24} />
+                </div>
+                <span className="text-gray-400 font-bold uppercase tracking-widest text-xs">Total Earned</span>
+              </div>
+              <span className="text-4xl font-black text-white">${Number(payoutSummary.summary.combined_total || 0).toFixed(2)}</span>
+            </div>
+          </div>
+        )}
 
         {/* Clients Table */}
         <div className="bg-gray-800/50 rounded-3xl border border-gray-700 overflow-hidden">
@@ -168,6 +229,78 @@ const CoachDashboard = () => {
                 <p className="text-gray-500">No clients found matching your search.</p>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Session Calendar */}
+        <div className="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-gray-800/50 rounded-3xl border border-gray-700 p-6">
+            <h3 className="text-white text-xl font-black mb-4">Schedule Video Call</h3>
+            <form onSubmit={scheduleSession} className="space-y-3">
+              <select
+                value={scheduleForm.client_id}
+                onChange={(e) => setScheduleForm({ ...scheduleForm, client_id: e.target.value })}
+                className="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 text-white"
+              >
+                <option value="">Select Client</option>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>{c.first_name} {c.last_name} (@{c.username})</option>
+                ))}
+              </select>
+              <input
+                type="datetime-local"
+                value={scheduleForm.scheduled_at}
+                onChange={(e) => setScheduleForm({ ...scheduleForm, scheduled_at: e.target.value })}
+                className="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 text-white"
+              />
+              <select
+                value={scheduleForm.duration_minutes}
+                onChange={(e) => setScheduleForm({ ...scheduleForm, duration_minutes: Number(e.target.value) })}
+                className="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 text-white"
+              >
+                <option value={30}>30 min</option>
+                <option value={45}>45 min</option>
+                <option value={60}>60 min</option>
+              </select>
+              <button type="submit" className="w-full py-3 rounded-xl bg-orange-500 hover:bg-orange-400 text-white font-black">
+                Schedule Session
+              </button>
+            </form>
+          </div>
+
+          <div className="bg-gray-800/50 rounded-3xl border border-gray-700 p-6">
+            <h3 className="text-white text-xl font-black mb-4">Upcoming Sessions</h3>
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {sessions.length === 0 && <p className="text-gray-500 text-sm">No sessions scheduled yet.</p>}
+              {sessions.map((s) => (
+                <div key={s.id} className="p-4 rounded-xl bg-gray-900 border border-gray-700">
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="text-white font-bold">{s.client_name || 'Client Session'}</p>
+                    <span className="text-xs text-orange-300 uppercase font-bold">{s.status}</span>
+                  </div>
+                  <p className="text-gray-400 text-sm">{new Date(s.scheduled_at).toLocaleString()}</p>
+                  <p className="text-gray-500 text-xs">{s.duration_minutes} minutes</p>
+                  {s.status === 'pending_approval' && (
+                    <p className="text-gray-500 text-xs mt-1">Requested by {s.requested_by_name || 'client'}</p>
+                  )}
+                  {s.meeting_link && (
+                    <a href={s.meeting_link} target="_blank" rel="noreferrer" className="inline-block mt-2 text-blue-400 text-sm hover:text-blue-300">
+                      Join Meeting
+                    </a>
+                  )}
+                  {s.status === 'pending_approval' && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <button onClick={() => respondToSession(s.id, 'accept')} className="px-3 py-2 rounded-lg bg-green-600 text-white text-xs font-black uppercase tracking-widest hover:bg-green-500">
+                        Accept
+                      </button>
+                      <button onClick={() => respondToSession(s.id, 'decline')} className="px-3 py-2 rounded-lg bg-red-600 text-white text-xs font-black uppercase tracking-widest hover:bg-red-500">
+                        Decline
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

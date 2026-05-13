@@ -1,0 +1,219 @@
+
+<style>
+  .wrap{padding:1rem 0}
+  .s{font-size:11px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.06em;margin:1.6rem 0 .6rem}
+  .s:first-child{margin-top:0}
+  .card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:1rem 1.15rem;margin-bottom:8px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:.5rem 0}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:.5rem 0}
+  .grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:.5rem 0}
+  .box{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.75rem .9rem;font-size:12px;color:var(--color-text-secondary);line-height:1.5}
+  .box strong{display:block;font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:3px}
+  .step{display:flex;gap:10px;align-items:flex-start;margin:8px 0;font-size:12px;color:var(--color-text-secondary);line-height:1.4}
+  .num{background:var(--color-background-info);color:var(--color-text-info);border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:500;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+  .num.g{background:#E1F5EE;color:#085041}
+  .num.p{background:#EEEDFE;color:#3C3489}
+  .num.a{background:#FAEEDA;color:#633806}
+  .tag{display:inline-flex;align-items:center;gap:4px;background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:20px;padding:3px 9px;font-size:11px;color:var(--color-text-secondary);margin:3px 3px 0 0}
+  .phase{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:.65rem .85rem}
+  .ph-title{font-size:12px;font-weight:500;color:var(--color-text-primary);margin-bottom:4px}
+  .ph-sub{font-size:11px;color:var(--color-text-secondary);line-height:1.4}
+  .ph-badge{display:inline-block;font-size:10px;padding:2px 7px;border-radius:var(--border-radius-md);font-weight:500;margin-bottom:5px}
+  .ph1{background:#B5D4F4;color:#0C447C}
+  .ph2{background:#9FE1CB;color:#085041}
+  .ph3{background:#CECBF6;color:#3C3489}
+  .ph4{background:#FAC775;color:#633806}
+  .ph5{background:#F4C0D1;color:#72243E}
+  .app-dir{font-family:monospace;font-size:11px;color:var(--color-text-secondary);line-height:1.8;background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.75rem 1rem}
+  .app-dir .folder{color:var(--color-text-primary);font-weight:500}
+  .app-dir .file{color:var(--color-text-secondary)}
+  .app-dir .comment{color:var(--color-border-secondary);font-style:italic}
+  hr.d{border:none;border-top:0.5px solid var(--color-border-tertiary);margin:1.25rem 0}
+  .ask-btn{background:transparent;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:8px 14px;font-size:13px;color:var(--color-text-primary);cursor:pointer;margin-top:1rem;width:100%}
+  .ask-btn:hover{background:var(--color-background-secondary)}
+  .convert-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:.5rem 0}
+  .cb{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:6px 10px;font-size:11px;color:var(--color-text-primary);text-align:center;flex:1;min-width:80px}
+  .cb.hi{background:#EEEDFE;border-color:#AFA9EC;color:#3C3489;font-weight:500}
+  .ca{color:var(--color-text-secondary);font-size:12px}
+</style>
+
+<div class="wrap">
+<h2 class="sr-only">FitPro full project blueprint — conversion strategy, onboarding, and Django + React architecture</h2>
+
+<p class="s">Finalized plans — locked</p>
+<div class="grid4">
+  <div class="box"><strong>Starter — $0</strong>Points economy, ad-supported, beginner plans only, basic BMI</div>
+  <div class="box"><strong>Flex — $9.99</strong>Unlimited library, ML body insights, health filters, no AI</div>
+  <div class="box"><strong>Pro — $24.99</strong>Full AI chat coach, AI meal planner, weekly ML adaptation, no sessions</div>
+  <div class="box"><strong>Elite — varies</strong>Pro + assigned trainer, 2×30min sessions/mo, 10 msgs/week, video call in-platform</div>
+  <div class="box"><strong>Custom — Elite+</strong>Elite base + extra sessions add-on, trainer gets 80%, platform 20% of add-on</div>
+</div>
+
+<hr class="d">
+<p class="s">What converts a free user — the full funnel</p>
+<div class="grid2">
+  <div class="card">
+    <div style="font-size:12px;font-weight:500;color:var(--color-text-primary);margin-bottom:8px">Signup hook (first 60 seconds)</div>
+    <div class="step"><div class="num">1</div>Instant body profile — height, weight, age, sex, goal. Show ML result immediately (body fat %, ideal weight). Free users taste ML value right away.</div>
+    <div class="step"><div class="num">2</div>Show them exactly 1 plan they can unlock for free (100 pts). Lock others behind blur with upgrade prompt.</div>
+    <div class="step"><div class="num">3</div>Progress bar showing "You are 4 ads away from your next plan" — gamified, drives daily return.</div>
+    <div class="step"><div class="num">4</div>Email capture on signup with welcome drip sequence.</div>
+  </div>
+  <div class="card">
+    <div style="font-size:12px;font-weight:500;color:var(--color-text-primary);margin-bottom:8px">Conversion triggers</div>
+    <div class="step"><div class="num g">A</div>After completing week 1 — "Your progress is being tracked. Upgrade to Pro to get AI-adjusted plan next week."</div>
+    <div class="step"><div class="num g">B</div>After 4 ads watched in a day — "You've hit your daily limit. Flex removes this forever for $9.99."</div>
+    <div class="step"><div class="num g">C</div>Show a locked AI meal plan preview with blurred content. "Unlock with Pro."</div>
+    <div class="step"><div class="num g">D</div>After 2 weeks on Pro — "Your trainer match is ready. See who'd be your Elite coach."</div>
+    <div class="step"><div class="num g">E</div>Trainer profile teaser on Pro dashboard — name, photo, specialty. Locked. Drives Elite upgrade.</div>
+  </div>
+</div>
+
+<div class="card">
+  <div style="font-size:12px;font-weight:500;color:var(--color-text-primary);margin-bottom:8px">Retention mechanics (stops churn)</div>
+  <div style="display:flex;flex-wrap:wrap;gap:6px">
+    <span class="tag"><i class="ti ti-flame" aria-hidden="true" style="font-size:12px"></i>Daily streak system</span>
+    <span class="tag"><i class="ti ti-trophy" aria-hidden="true" style="font-size:12px"></i>Weekly challenges</span>
+    <span class="tag"><i class="ti ti-chart-line" aria-hidden="true" style="font-size:12px"></i>Progress photos + body trend</span>
+    <span class="tag"><i class="ti ti-bell" aria-hidden="true" style="font-size:12px"></i>Smart push notifications</span>
+    <span class="tag"><i class="ti ti-calendar" aria-hidden="true" style="font-size:12px"></i>Session reminders (Elite)</span>
+    <span class="tag"><i class="ti ti-mail" aria-hidden="true" style="font-size:12px"></i>Weekly AI progress email</span>
+    <span class="tag"><i class="ti ti-users" aria-hidden="true" style="font-size:12px"></i>Community feed (optional)</span>
+    <span class="tag"><i class="ti ti-gift" aria-hidden="true" style="font-size:12px"></i>Referral bonus points</span>
+  </div>
+</div>
+
+<hr class="d">
+<p class="s">Onboarding flow — every new user</p>
+<div class="convert-row">
+  <div class="cb">Landing page<br><span style="font-size:10px;color:var(--color-text-secondary)">plan select</span></div>
+  <div class="ca">→</div>
+  <div class="cb hi">Body profile<br><span style="font-size:10px">5 questions</span></div>
+  <div class="ca">→</div>
+  <div class="cb">ML result<br><span style="font-size:10px;color:var(--color-text-secondary)">shown instantly</span></div>
+  <div class="ca">→</div>
+  <div class="cb">Goal select<br><span style="font-size:10px;color:var(--color-text-secondary)">lose/gain/maintain</span></div>
+  <div class="ca">→</div>
+  <div class="cb">Diet pref<br><span style="font-size:10px;color:var(--color-text-secondary)">veg/vegan/etc</span></div>
+  <div class="ca">→</div>
+  <div class="cb hi">Dashboard<br><span style="font-size:10px">personalised</span></div>
+</div>
+<div style="font-size:11px;color:var(--color-text-secondary);margin-top:6px">Free users see ML body result immediately — creates instant value. Paid users also get AI coach intro message on dashboard.</div>
+
+<hr class="d">
+<p class="s">Django backend — full project structure</p>
+<div class="app-dir">
+<span class="folder">fitpro/</span><br>
+<span class="folder">├── config/</span>                   <span class="comment"># project settings</span><br>
+<span class="file">│   ├── settings/</span><br>
+<span class="file">│   │   ├── base.py</span>           <span class="comment"># shared settings</span><br>
+<span class="file">│   │   ├── dev.py</span>            <span class="comment"># local dev overrides</span><br>
+<span class="file">│   │   └── prod.py</span>           <span class="comment"># production (env vars)</span><br>
+<span class="file">│   ├── urls.py</span>               <span class="comment"># root URL router</span><br>
+<span class="file">│   ├── wsgi.py</span><br>
+<span class="file">│   └── asgi.py</span>               <span class="comment"># WebSocket + HTTP</span><br>
+<br>
+<span class="folder">├── apps/</span><br>
+<span class="folder">│   ├── users/</span>                <span class="comment"># auth, profiles, subscriptions</span><br>
+<span class="file">│   │   ├── models.py</span>         <span class="comment"># User, UserProfile, BodyStats</span><br>
+<span class="file">│   │   ├── serializers.py</span><br>
+<span class="file">│   │   ├── views.py</span>          <span class="comment"># register, login, profile CRUD</span><br>
+<span class="file">│   │   └── signals.py</span>        <span class="comment"># post-save → create profile</span><br>
+<br>
+<span class="folder">│   ├── subscriptions/</span>        <span class="comment"># plans, billing, points</span><br>
+<span class="file">│   │   ├── models.py</span>         <span class="comment"># Plan, Subscription, PointLedger</span><br>
+<span class="file">│   │   ├── views.py</span>          <span class="comment"># upgrade, cancel, ad-watch reward</span><br>
+<span class="file">│   │   └── stripe_webhooks.py</span><span class="comment"># payment events</span><br>
+<br>
+<span class="folder">│   ├── plans/</span>                <span class="comment"># workout + meal plan library</span><br>
+<span class="file">│   │   ├── models.py</span>         <span class="comment"># WorkoutPlan, MealPlan, Exercise, Meal</span><br>
+<span class="file">│   │   ├── views.py</span>          <span class="comment"># list, detail, unlock with points</span><br>
+<span class="file">│   │   └── filters.py</span>        <span class="comment"># goal/level/condition filters</span><br>
+<br>
+<span class="folder">│   ├── ai/</span>                   <span class="comment"># AI chat + meal generation</span><br>
+<span class="file">│   │   ├── views.py</span>          <span class="comment"># chat endpoint, meal plan generate</span><br>
+<span class="file">│   │   ├── prompts.py</span>        <span class="comment"># system prompt templates</span><br>
+<span class="file">│   │   └── rate_limiter.py</span>   <span class="comment"># per-user token limits</span><br>
+<br>
+<span class="folder">│   ├── ml/</span>                   <span class="comment"># ML models + inference</span><br>
+<span class="file">│   │   ├── body_analysis.py</span>  <span class="comment"># body fat %, BMR, ideal weight</span><br>
+<span class="file">│   │   ├── plan_ranker.py</span>    <span class="comment"># ML plan recommendation engine</span><br>
+<span class="file">│   │   └── progress_model.py</span> <span class="comment"># weekly adaptation logic</span><br>
+<br>
+<span class="folder">│   ├── trainers/</span>             <span class="comment"># trainer management</span><br>
+<span class="file">│   │   ├── models.py</span>         <span class="comment"># Trainer, TrainerAssignment, Availability</span><br>
+<span class="file">│   │   ├── views.py</span>          <span class="comment"># assign, swap, capacity check</span><br>
+<span class="file">│   │   └── assignment.py</span>     <span class="comment"># auto-assign logic</span><br>
+<br>
+<span class="folder">│   ├── sessions/</span>             <span class="comment"># video call + chat</span><br>
+<span class="file">│   │   ├── models.py</span>         <span class="comment"># Session, Message, MessageQuota</span><br>
+<span class="file">│   │   ├── views.py</span>          <span class="comment"># schedule, join, message CRUD</span><br>
+<span class="file">│   │   └── consumers.py</span>      <span class="comment"># Django Channels WebSocket</span><br>
+<br>
+<span class="folder">│   ├── progress/</span>             <span class="comment"># tracking + analytics</span><br>
+<span class="file">│   │   ├── models.py</span>         <span class="comment"># WorkoutLog, WeightLog, PhotoLog</span><br>
+<span class="file">│   │   └── views.py</span>          <span class="comment"># log entry, trend data</span><br>
+<br>
+<span class="folder">│   ├── ads/</span>                  <span class="comment"># ad serving + point rewards</span><br>
+<span class="file">│   │   ├── models.py</span>         <span class="comment"># AdView, DailyAdCap</span><br>
+<span class="file">│   │   └── views.py</span>          <span class="comment"># verify ad watch → award points</span><br>
+<br>
+<span class="folder">│   └── notifications/</span>        <span class="comment"># push + email</span><br>
+<span class="file">│       ├── tasks.py</span>          <span class="comment"># Celery: streak alerts, upgrade nudges</span><br>
+<span class="file">│       └── email.py</span>          <span class="comment"># drip campaigns via SendGrid</span><br>
+<br>
+<span class="folder">├── ml_models/</span>                <span class="comment"># trained model files (.pkl, .onnx)</span><br>
+<span class="folder">├── media/</span>                    <span class="comment"># user uploads (progress photos)</span><br>
+<span class="folder">├── static/</span><br>
+<span class="file">├── requirements.txt</span><br>
+<span class="file">├── manage.py</span><br>
+<span class="file">└── docker-compose.yml</span>
+</div>
+
+<hr class="d">
+<p class="s">React frontend — structure</p>
+<div class="app-dir">
+<span class="folder">fitpro-frontend/</span><br>
+<span class="folder">├── src/</span><br>
+<span class="folder">│   ├── api/</span>                  <span class="comment"># axios instances + endpoint calls</span><br>
+<span class="folder">│   ├── store/</span>                <span class="comment"># Redux Toolkit slices</span><br>
+<span class="file">│   │   ├── authSlice.js</span><br>
+<span class="file">│   │   ├── subscriptionSlice.js</span><br>
+<span class="file">│   │   └── progressSlice.js</span><br>
+<span class="folder">│   ├── pages/</span><br>
+<span class="file">│   │   ├── Onboarding.jsx</span>    <span class="comment"># multi-step body profile</span><br>
+<span class="file">│   │   ├── Dashboard.jsx</span>     <span class="comment"># personalised home</span><br>
+<span class="file">│   │   ├── Plans.jsx</span>         <span class="comment"># plan library + unlock</span><br>
+<span class="file">│   │   ├── AICoach.jsx</span>       <span class="comment"># chat interface (Pro+)</span><br>
+<span class="file">│   │   ├── Progress.jsx</span>      <span class="comment"># logs, charts, photos</span><br>
+<span class="file">│   │   ├── TrainerPortal.jsx</span> <span class="comment"># trainer view</span><br>
+<span class="file">│   │   ├── Session.jsx</span>       <span class="comment"># video call page</span><br>
+<span class="file">│   │   └── Pricing.jsx</span>       <span class="comment"># plan upgrade page</span><br>
+<span class="folder">│   ├── components/</span>           <span class="comment"># shared UI components</span><br>
+<span class="folder">│   ├── hooks/</span>                <span class="comment"># useAuth, useSubscription, usePoints</span><br>
+<span class="folder">│   └── utils/</span><br>
+</div>
+
+<hr class="d">
+<p class="s">Tech stack</p>
+<div class="grid3">
+  <div class="box"><strong>Backend</strong>Django 5 · DRF · Django Channels (WebSocket) · Celery + Redis · PostgreSQL · JWT auth</div>
+  <div class="box"><strong>Frontend</strong>React 18 · Redux Toolkit · React Query · Tailwind CSS · Vite</div>
+  <div class="box"><strong>Infrastructure</strong>Docker · Nginx · AWS S3 (media) · Stripe (billing) · Daily.co (video) · SendGrid (email)</div>
+  <div class="box"><strong>AI / ML</strong>OpenAI API (chat coach) · Scikit-learn (body ML) · Celery tasks (weekly adaptation)</div>
+  <div class="box"><strong>Ads</strong>Google AdSense or custom ad server · server-side ad view verification before awarding points</div>
+  <div class="box"><strong>DevOps</strong>GitHub Actions CI/CD · Docker Compose (local) · AWS EC2 or Railway (prod)</div>
+</div>
+
+<hr class="d">
+<p class="s">Build phases — step by step</p>
+<div class="grid2">
+  <div class="phase"><div class="ph-badge ph1">Phase 1 — 4 wks</div><div class="ph-title">Core foundation</div><div class="ph-sub">User auth + profiles · Subscription model + Stripe · Plan library (manual content) · Point economy + ad verification · Basic ML body analysis</div></div>
+  <div class="phase"><div class="ph-badge ph2">Phase 2 — 3 wks</div><div class="ph-title">AI + ML layer</div><div class="ph-sub">AI chat coach (OpenAI) · AI meal plan generator · ML plan ranker · Weekly auto-adjustment Celery task · Progress logging</div></div>
+  <div class="phase"><div class="ph-badge ph3">Phase 3 — 3 wks</div><div class="ph-title">Trainer system</div><div class="ph-sub">Trainer profiles + onboarding · Auto-assignment engine · Message quota system · Session scheduling · Payout tracking</div></div>
+  <div class="phase"><div class="ph-badge ph4">Phase 4 — 2 wks</div><div class="ph-title">Video + real-time</div><div class="ph-sub">Daily.co video integration · WebSocket chat (Django Channels) · In-app notifications · Push notifications</div></div>
+  <div class="phase"><div class="ph-badge ph5">Phase 5 — 2 wks</div><div class="ph-title">Polish + launch</div><div class="ph-sub">Conversion flows + upgrade nudges · Referral system · Email drip campaigns · Admin dashboard · Load testing · UI customisation</div></div>
+</div>
+
+<button class="ask-btn" onclick="sendPrompt('Lets start building — begin with Phase 1: Django project setup, user auth, and subscription models ↗')">Start Phase 1 — Django setup ↗</button>
+</div>

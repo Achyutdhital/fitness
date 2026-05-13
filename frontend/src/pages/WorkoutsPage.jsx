@@ -1,19 +1,22 @@
 import React, { useEffect, useState } from 'react'
 import { workoutAPI, coreAPI } from '../services/api'
 import { Link, useNavigate } from 'react-router-dom'
-import { FiSearch, FiClock, FiZap, FiStar, FiFilter, FiLock, FiUnlock } from 'react-icons/fi'
+import { FiSearch, FiClock, FiZap, FiFilter, FiActivity } from 'react-icons/fi'
+import AdRewardModal from '../components/AdRewardModal'
 import { useAuth } from '../context/AuthContext'
 
 const WorkoutsPage = () => {
-  const { user, subscription } = useAuth()
+  const { user, subscription, fetchUser } = useAuth()
   const navigate = useNavigate()
   const [workouts, setWorkouts] = useState([])
   const [programs, setPrograms] = useState([])
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
-  const [viewType, setViewType] = useState('programs') // Default to structured programs
+  const [viewType, setViewType] = useState('library')
   const [filters, setFilters] = useState({ category: '', difficulty_level: '' })
   const [search, setSearch] = useState('')
+  const [unlockingId, setUnlockingId] = useState(null)
+  const [isAdModalOpen, setIsAdModalOpen] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -29,14 +32,27 @@ const WorkoutsPage = () => {
           workoutAPI.getWorkouts(params),
           categories.length === 0 ? workoutAPI.getCategories() : Promise.resolve({ data: categories })
         ])
-        setWorkouts(workoutsRes.data.results || workoutsRes.data)
-        setCategories(catsRes.data.results || catsRes.data)
+        
+        const wData = workoutsRes.data?.results || workoutsRes.data || []
+        const cData = catsRes.data?.results || catsRes.data || []
+        
+        setWorkouts(Array.isArray(wData) ? wData : [])
+        setCategories(Array.isArray(cData) ? cData : [])
       } else {
         const res = await workoutAPI.getPrograms()
-        setPrograms(res.data.results || res.data)
+        const pData = res.data?.results || res.data || []
+        const normalizedPrograms = Array.isArray(pData) ? pData : []
+        setPrograms(normalizedPrograms)
+
+        // Fallback to library if no structured programs exist yet.
+        if (normalizedPrograms.length === 0) {
+          setViewType('library')
+        }
       }
     } catch (error) {
       console.error('Failed to load data:', error)
+      setWorkouts([])
+      setPrograms([])
     } finally {
       setLoading(false)
     }
@@ -115,7 +131,15 @@ const WorkoutsPage = () => {
               <div className="text-blue-400 w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center"><FiZap size={20} /></div>
               <div>
                 <p className="text-white font-black text-sm mb-0.5">Free Access Points</p>
-                <p className="text-blue-400 text-xs font-bold tracking-widest uppercase">{user?.points?.total_points || 0} PTS Available</p>
+                <div className="flex items-center gap-3">
+                  <p className="text-blue-400 text-xs font-bold tracking-widest uppercase">{user?.points?.total_points || 0} PTS Available</p>
+                  <button 
+                    onClick={() => setIsAdModalOpen(true)}
+                    className="px-3 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-500/30 transition-all"
+                  >
+                    + EARN
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -229,6 +253,15 @@ const WorkoutsPage = () => {
           </div>
         )}
       </div>
+      {/* Ad Modal */}
+      <AdRewardModal 
+        isOpen={isAdModalOpen}
+        onClose={() => setIsAdModalOpen(false)}
+        onReward={() => {
+          alert('Points added! You can now try to unlock the session.')
+          fetchUser() // refresh points
+        }}
+      />
     </div>
   )
 }

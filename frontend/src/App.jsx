@@ -8,8 +8,11 @@ import Footer from './components/Footer'
 import AICoach from './components/AICoach'
 
 import LandingPage from './pages/LandingPage'
+import OnboardingPage from './pages/OnboardingPage'
+import OAuthCallbackPage from './pages/OAuthCallbackPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
+import EnhancedSignupPage from './pages/SignupPageNew'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import SubscriptionsPage from './pages/SubscriptionsPage'
@@ -29,6 +32,7 @@ import MeasurementsPage from './pages/MeasurementsPage'
 import NotificationsPage from './pages/NotificationsPage'
 import AdminLayout from './pages/admin/AdminLayout'
 import CoachDashboard from './pages/CoachDashboard'
+import CoachingPage from './pages/CoachingPage'
 import NotFoundPage from './pages/NotFoundPage'
 
 function App() {
@@ -39,6 +43,13 @@ function App() {
           <div className="min-h-screen flex flex-col">
             <Routes>
               <Route path="/admin/*" element={<AdminLayout />} />
+              
+              {/* Onboarding & Auth - No Navbar/Footer */}
+              <Route path="/onboarding" element={<OnboardingPage />} />
+              <Route path="/signup" element={<EnhancedSignupPage />} />
+              <Route path="/oauth-callback" element={<OAuthCallbackPage />} />
+              
+              {/* Main App - With Navbar/Footer */}
               <Route path="/*" element={
                 <>
                   <Navbar />
@@ -68,6 +79,7 @@ function App() {
                       <Route path="/measurements" element={<ProtectedRoute><MeasurementsPage /></ProtectedRoute>} />
                       <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
                       <Route path="/coach-dashboard" element={<ProtectedRoute><CoachDashboard /></ProtectedRoute>} />
+                      <Route path="/coaching" element={<ProtectedRoute><CoachingPage /></ProtectedRoute>} />
 
                       <Route path="*" element={<NotFoundPage />} />
                     </Routes>

@@ -11,7 +11,7 @@ from .models import (
 from .serializers import (
     WorkoutSerializer, WorkoutDetailSerializer, WorkoutCategorySerializer,
     MealPlanSerializer, MealPlanDetailSerializer, UserWorkoutProgressSerializer,
-    WorkoutProgramSerializer, WorkoutPhaseSerializer
+    WorkoutProgramSerializer, WorkoutPhaseSerializer, WorkoutSetSerializer
 )
 
 
@@ -77,22 +77,90 @@ class WorkoutViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
-    def mark_complete(self, request, pk=None):
-        """Mark workout as completed"""
+    def start_workout(self, request, pk=None):
+        """Initialize or resume a live workout session"""
+        workout = self.get_object()
+        user = request.user
+        from django.utils import timezone
+        
+        progress, created = UserWorkoutProgress.objects.get_or_create(
+            user=user,
+            workout=workout,
+            defaults={'status': 'in_progress', 'started_at': timezone.now()}
+        )
+        
+        if not created and progress.status == 'not_started':
+            progress.status = 'in_progress'
+            progress.started_at = timezone.now()
+            progress.save()
+            
+        return Response(UserWorkoutProgressSerializer(progress).data)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def log_set(self, request, pk=None):
+        """Log a specific set for an exercise in the current workout"""
+        from .models import WorkoutSet, Exercise
         workout = self.get_object()
         user = request.user
         
-        progress, created = UserWorkoutProgress.objects.update_or_create(
-            user=user,
-            workout=workout,
+        progress = UserWorkoutProgress.objects.filter(user=user, workout=workout).first()
+        if not progress:
+            return Response({'error': 'Workout session not started'}, status=400)
+            
+        exercise_id = request.data.get('exercise_id')
+        set_number = request.data.get('set_number')
+        weight = request.data.get('weight')
+        reps = request.data.get('reps')
+        
+        if not all([exercise_id, set_number]):
+            return Response({'error': 'exercise_id and set_number required'}, status=400)
+            
+        exercise = Exercise.objects.get(id=exercise_id, workout=workout)
+        
+        workout_set, _ = WorkoutSet.objects.update_or_create(
+            progress=progress,
+            exercise=exercise,
+            set_number=set_number,
             defaults={
-                'completed': True,
-                'completed_date': None,
-                'calories_burnt': request.data.get('calories_burnt'),
-                'duration_minutes': request.data.get('duration_minutes'),
-                'notes': request.data.get('notes', '')
+                'weight': weight,
+                'reps': reps,
+                'is_completed': True
             }
         )
+        
+        return Response({'message': 'Set logged successfully', 'set_id': workout_set.id})
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def mark_complete(self, request, pk=None):
+        """Mark workout as completed and calculate stats"""
+        from django.utils import timezone
+        workout = self.get_object()
+        user = request.user
+        
+        progress = UserWorkoutProgress.objects.filter(user=user, workout=workout).first()
+        
+        now = timezone.now()
+        duration = 0
+        if progress and progress.started_at:
+            delta = now - progress.started_at
+            duration = int(delta.total_seconds() / 60)
+            
+        if not progress:
+            progress = UserWorkoutProgress.objects.create(user=user, workout=workout)
+
+        progress.completed = True
+        progress.status = 'completed'
+        progress.completed_date = now
+        progress.duration_minutes = duration or request.data.get('duration_minutes', workout.duration_minutes)
+        progress.calories_burnt = request.data.get('calories_burnt', workout.calories_burnt)
+        progress.notes = request.data.get('notes', '')
+        progress.save()
+        
+        # Award points for completion
+        from core.models import UserPoints
+        points, _ = UserPoints.objects.get_or_create(user=user)
+        points.total_points += 50 # Base points for workout
+        points.save()
         
         serializer = UserWorkoutProgressSerializer(progress)
         return Response(serializer.data)

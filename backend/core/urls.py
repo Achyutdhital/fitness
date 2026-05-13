@@ -21,5 +21,7 @@ router.register(r'ads', AdUnlockViewSet, basename='ads')
 router.register(r'coach', CoachViewSet, basename='coach')
 router.register(r'reminders', ReminderViewSet, basename='reminders')
 router.register(r'ai', AICoachViewSet, basename='ai')
+from .views import CoachSessionViewSet
+router.register(r'sessions', CoachSessionViewSet, basename='sessions')
 
 urlpatterns = router.urls

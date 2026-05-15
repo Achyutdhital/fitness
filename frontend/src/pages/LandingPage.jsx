@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { FiArrowRight, FiCheck, FiStar, FiPlay, FiUsers, FiAward, FiTrendingUp, FiHeart, FiZap, FiTarget, FiClock, FiVideo } from 'react-icons/fi'
+import PlanCard from '../components/PlanCard'
 import { useAuth } from '../context/AuthContext'
 import { subscriptionAPI } from '../services/api'
 import { motion } from 'framer-motion'
@@ -39,6 +40,8 @@ const LandingPage = () => {
   const [activeTestimonial, setActiveTestimonial] = useState(0)
   const [tiers, setTiers] = useState([])
   const [billingCycle, setBillingCycle] = useState('monthly')
+  const [customSessionsPerWeek, setCustomSessionsPerWeek] = useState(4)
+  const [customSessionMinutes, setCustomSessionMinutes] = useState(30)
 
   useEffect(() => {
     const timer = setInterval(() => setActiveTestimonial(p => (p + 1) % testimonials.length), 4000)
@@ -50,23 +53,77 @@ const LandingPage = () => {
     try {
       const response = await subscriptionAPI.getTiers()
       const data = response.data.results || response.data || []
-      setTiers(Array.isArray(data) ? data : [])
+      const normalized = Array.isArray(data)
+        ? data.map((tier) => ({ ...tier, plans: tier.plans || tier.packages || [] }))
+        : []
+      setTiers(normalized)
     } catch (error) {
       console.error('Failed to load tiers:', error)
     }
   }
 
-  const getTierIcon = (name) => {
-    switch (name.toLowerCase()) {
-      case 'free': return <FiClock size={24} className="text-blue-400" />
-      case 'pro': return <FiStar size={24} className="text-purple-400" />
-      case 'elite': return <FiZap size={24} className="text-orange-400" />
-      default: return <FiCheck size={24} className="text-green-400" />
-    }
-  }
+  const currentTierName = subscription?.is_custom ? 'custom' : (subscription?.tier_details?.name?.toLowerCase() || 'free')
+  const visibleTiers = tiers.filter(tier => tier.name.toLowerCase() !== 'custom')
+  const currentTierIndex = visibleTiers.findIndex(t => t.name.toLowerCase() === currentTierName)
+  const getTierRank = (name) => ({ free: 0, basic: 1, pro: 2, elite: 3, custom: 4 }[name?.toLowerCase()] ?? -1)
+  const currentTierRank = getTierRank(currentTierName)
+  const isSubscriptionActive = ['active', 'trial'].includes(subscription?.status) && (!subscription?.end_date || new Date(subscription.end_date) > new Date())
+  const showOnlyUpgrades = Boolean(subscription && isSubscriptionActive && currentTierRank >= 0)
+  const filteredVisibleTiers = showOnlyUpgrades ? visibleTiers.filter(t => getTierRank(t.name) > currentTierRank) : visibleTiers
+  const activeCustomConfig = subscription?.is_custom ? subscription?.custom_config : null
+  const eliteTier = tiers.find(tier => tier.name.toLowerCase() === 'elite')
+  const eliteBillingPlan = eliteTier?.plans?.find(plan => plan.billing_cycle === billingCycle)
+  const eliteBasePrice = Number(eliteBillingPlan?.price || 0)
+  const eliteHourlyRate = Number(eliteTier?.custom_hourly_rate || 0)
 
-  const currentTierName = subscription?.tier_details?.name?.toLowerCase() || 'free'
-  const currentTierIndex = tiers.findIndex(t => t.name.toLowerCase() === currentTierName)
+  const billingCycleWeeks = {
+    monthly: 4,
+    quarterly: 13,
+    yearly: 52,
+  }
+  const billingCycleLabels = {
+    monthly: 'Monthly total',
+    quarterly: 'Quarterly total',
+    yearly: 'Yearly total',
+  }
+  const customSessionsValue = Number(activeCustomConfig?.sessions_per_week || customSessionsPerWeek)
+  const customMinutesValue = Number(activeCustomConfig?.session_duration_minutes || customSessionMinutes)
+  const customWeeklyHours = (customSessionsValue * customMinutesValue) / 60
+  const customWeeklyAddon = customWeeklyHours * eliteHourlyRate
+  const customCycleWeeks = billingCycleWeeks[billingCycle] || 4
+
+  const billingCycleDiscounts = {
+    monthly: 1,
+    quarterly: 0.9,
+    yearly: 0.8,
+  }
+  const customCycleDiscount = billingCycleDiscounts[billingCycle] || 1
+  const customCycleAddon = customWeeklyAddon * customCycleWeeks * customCycleDiscount
+  const customCycleTotal = eliteBasePrice + customCycleAddon
+  const eliteMonthlyPlan = eliteTier?.plans?.find(plan => plan.billing_cycle === 'monthly')
+  const eliteMonthlyPrice = Number(eliteMonthlyPlan?.price || 0)
+  const customCoachPlan = {
+    id: 'custom-coach',
+    name: 'Custom Coach',
+    billing_cycle: billingCycle,
+    duration_days: eliteBillingPlan?.duration_days || 30,
+    price: customCycleTotal.toFixed(2),
+    is_custom: true,
+    custom_config: {
+      name: 'Custom Coach',
+      billing_cycle: billingCycle,
+      base_plan_id: eliteBillingPlan?.id,
+      base_plan_name: eliteBillingPlan ? `${eliteTier.name} ${billingCycle}` : `Elite ${billingCycle}`,
+      base_price: eliteBasePrice.toFixed(2),
+      hourly_rate: eliteHourlyRate.toFixed(2),
+      sessions_per_week: customSessionsValue,
+      session_duration_minutes: customMinutesValue,
+      weekly_addon: customWeeklyAddon.toFixed(2),
+      billing_cycle_addon: customCycleAddon.toFixed(2),
+      monthly_addon: customCycleAddon.toFixed(2),
+      total_price: customCycleTotal.toFixed(2),
+    },
+  }
 
   return (
     <div className="min-h-screen overflow-hidden">
@@ -111,7 +168,7 @@ const LandingPage = () => {
                 <FiArrowRight />
               </Link>
               <Link
-                to="/subscriptions"
+                to={isAuthenticated ? '/profile' : '/onboarding'}
                 className="btn text-lg px-8 py-4 bg-white/10 text-white border border-white/30 hover:bg-white/20 backdrop-blur-sm flex items-center space-x-2"
               >
                 <FiPlay size={18} />
@@ -321,7 +378,7 @@ const LandingPage = () => {
           <div className="text-center mb-16">
             <div className="inline-flex items-center space-x-2 bg-orange-500/10 border border-orange-500/20 rounded-full px-4 py-2 mb-6">
               <FiZap className="text-orange-400" />
-              <span className="text-orange-400 text-[10px] font-black uppercase tracking-widest">Select Your Protocol</span>
+              <span className="text-orange-400 text-[10px] font-black uppercase tracking-widest">Select Your Package</span>
             </div>
             <h2 className="text-4xl md:text-5xl font-black text-white mb-6">
               Elite <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-pink-600">Access</span>
@@ -348,130 +405,177 @@ const LandingPage = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
-            {tiers.map((tier, idx) => {
-              const plan = tier.plans.find(p => p.billing_cycle === billingCycle)
-              const isFree = tier.name.toLowerCase() === 'free'
-              const isPopular = tier.name.toLowerCase() === 'pro'
-              const isCurrent = tier.name.toLowerCase() === currentTierName
-              
-              let buttonText = 'Subscribe'
-              let buttonLink = isAuthenticated ? '/payment' : '/register'
-              
-              let isIncluded = false
-              if (isAuthenticated) {
-                if (isCurrent) {
-                  buttonText = 'Current Plan'
-                  buttonLink = '/dashboard'
-                } else if (idx > currentTierIndex) {
-                  buttonText = 'Upgrade'
-                } else if (idx < currentTierIndex) {
-                  buttonText = 'Included'
-                  isIncluded = true
-                  buttonLink = '/dashboard'
-                }
-              } else {
-                if (isFree) {
-                  buttonText = 'Initialize'
-                } else {
-                  buttonText = 'Subscribe'
-                }
-              }
-              
-              return (
-                <div
-                  key={tier.id}
-                  className={`relative rounded-[2.5rem] p-8 transition-all duration-500 group ${
-                    isPopular
-                      ? 'bg-slate-900 border-2 border-orange-500 shadow-2xl shadow-orange-500/10'
-                      : 'bg-slate-900/50 backdrop-blur-xl border border-slate-800/50 hover:border-orange-500/30'
-                  }`}
-                >
-                  {isPopular && (
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-orange-500 text-white px-6 py-1 rounded-full text-[10px] font-black tracking-widest">
-                      MOST POPULAR
-                    </div>
-                  )}
+          <div className="max-w-7xl mx-auto">
+            {showOnlyUpgrades && (
+              <div className="mb-6">
+                <h4 className="text-sm text-slate-400 font-black mb-3">Your current plan</h4>
+                {tiers.find(t => t.name.toLowerCase() === currentTierName) ? (
+                  (() => {
+                    const cur = tiers.find(t => t.name.toLowerCase() === currentTierName)
+                    const curPkg = cur?.plans?.find(p => p.billing_cycle === billingCycle)
+                    return (
+                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                        <PlanCard
+                          tier={cur}
+                          pkg={curPkg}
+                          billingCycle={billingCycle}
+                          idx={currentTierIndex}
+                          currentTierName={currentTierName}
+                          currentTierIndex={currentTierIndex}
+                          isAuthenticated={isAuthenticated}
+                          isInRenewalWindow={subscription?.is_in_renewal_window}
+                          userIsCustom={Boolean(subscription?.is_custom)}
+                        />
+                      </motion.div>
+                    )
+                  })()
+                ) : (
+                  <div className="text-slate-400">No active plan found.</div>
+                )}
+              </div>
+            )}
 
-                  <div className="flex items-center space-x-4 mb-8">
-                    <div className="w-14 h-14 rounded-2xl bg-slate-800/50 flex items-center justify-center border border-slate-700/50 shadow-inner group-hover:bg-orange-500/10 transition-colors duration-500">
-                      {getTierIcon(tier.name)}
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-black text-white tracking-tight uppercase">{tier.name}</h3>
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Tier {idx + 1}</span>
-                    </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {filteredVisibleTiers.map((tier, idx) => {
+                const pkg = tier.plans.find(p => p.billing_cycle === billingCycle)
+                return (
+                  <motion.div
+                    key={tier.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                  >
+                    <PlanCard
+                      tier={tier}
+                      pkg={pkg}
+                      billingCycle={billingCycle}
+                      idx={idx}
+                      currentTierName={currentTierName}
+                      currentTierIndex={currentTierIndex}
+                      isAuthenticated={isAuthenticated}
+                      isInRenewalWindow={subscription?.is_in_renewal_window}
+                      userIsCustom={Boolean(subscription?.is_custom)}
+                    />
+                  </motion.div>
+                )
+              })}
+            </div>
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="mt-12 max-w-7xl mx-auto rounded-[3rem] border border-slate-800/70 bg-slate-900/70 backdrop-blur-xl p-8 md:p-10 relative overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 via-transparent to-blue-500/10 pointer-events-none" />
+            <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+              <div>
+                <div className="inline-flex items-center space-x-2 bg-orange-500/10 border border-orange-500/20 rounded-full px-4 py-2 mb-4">
+                  <FiZap className="text-orange-400" />
+                  <span className="text-orange-400 text-[10px] font-black uppercase tracking-widest">Custom Coach Calculator</span>
+                </div>
+                <h3 className="text-3xl md:text-4xl font-black text-white tracking-tight mb-4">Build a custom 1-on-1 coaching package</h3>
+                <p className="text-slate-400 max-w-2xl mb-6">
+                  Your custom pkg starts with the Elite pkg for the selected billing cycle and adds personalized 1-on-1 coaching time tailored to your specific goals and schedule.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <label className="space-y-2">
+                    <span className="block text-[10px] font-black uppercase tracking-widest text-slate-500">Sessions / week</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="7"
+                      value={customSessionsValue}
+                      onChange={(e) => setCustomSessionsPerWeek(Math.min(7, Math.max(1, Number(e.target.value) || 1)))}
+                      className="w-full rounded-2xl bg-slate-950 border border-slate-800 px-4 py-3 text-white outline-none focus:border-orange-500"
+                    />
+                    {customSessionsValue >= 7 && <p className="text-[9px] text-orange-400 font-bold mt-1">MAX CAPACITY: 1 SESSION / DAY</p>}
+                  </label>
+                  <label className="space-y-2">
+                    <span className="block text-[10px] font-black uppercase tracking-widest text-slate-500">Session length (min)</span>
+                    <input
+                      type="number"
+                      min="15"
+                      max="120"
+                      step="15"
+                      value={customMinutesValue}
+                      onChange={(e) => setCustomSessionMinutes(Math.min(120, Math.max(15, Number(e.target.value) || 15)))}
+                      className="w-full rounded-2xl bg-slate-950 border border-slate-800 px-4 py-3 text-white outline-none focus:border-orange-500"
+                    />
+                    {customMinutesValue >= 120 && <p className="text-[9px] text-orange-400 font-bold mt-1">MAX INTENSITY: 2 HOURS</p>}
+                  </label>
+                </div>
+              </div>
+
+              <div className="rounded-[2rem] border border-slate-800 bg-slate-950/80 p-6 md:p-8">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-5">{activeCustomConfig ? 'Current Custom Plan' : 'Price Breakdown'}</p>
+                {activeCustomConfig && (
+                  <div className="mb-5 rounded-2xl border border-green-500/20 bg-green-500/10 p-4 text-green-100">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-green-300 mb-1">Active custom subscription</p>
+                    <p className="text-sm font-bold">{activeCustomConfig.sessions_per_week} sessions/week · {activeCustomConfig.session_duration_minutes} min each</p>
+                    <p className="text-[10px] text-green-200/80 mt-2">Current billing cycle: {activeCustomConfig.billing_cycle}</p>
                   </div>
-
-                  <div className="mb-10">
-                    {isFree ? (
-                      <div className="flex flex-col">
-                        <span className="text-5xl font-black text-white">FREE</span>
-                        <span className="text-blue-400 text-[10px] font-black uppercase tracking-widest mt-2 flex items-center gap-2">
-                          <FiVideo size={14} /> AD-SUPPORTED
+                )}
+                <div className="space-y-3 text-sm text-slate-300">
+                  <div className="flex items-center justify-between gap-4">
+                    <span>{eliteBillingPlan ? `${eliteTier.name} ${billingCycle} base` : 'Elite base plan'}</span>
+                    <div className="text-right">
+                      {billingCycle !== 'monthly' && (
+                        <span className="text-slate-500 line-through text-xs mr-2">
+                          ${(eliteMonthlyPrice * (billingCycle === 'quarterly' ? 3 : 12)).toFixed(2)}
                         </span>
-                      </div>
-                    ) : (
-                      <div>
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-5xl font-black text-white">
-                            ${plan ? plan.price : '—'}
-                          </span>
-                          <span className="text-slate-500 text-xs font-black uppercase tracking-widest">
-                            /{billingCycle === 'monthly' ? 'mo' : billingCycle === 'quarterly' ? '3mo' : 'yr'}
-                          </span>
-                        </div>
-                        <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-2">Billed {billingCycle}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {isCurrent || isIncluded ? (
-                    <div className="w-full py-5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] text-center block transition-all bg-green-500/20 text-green-400 border border-green-500/30">
-                      {buttonText}
+                      )}
+                      <span className="font-black text-white">${eliteBasePrice.toFixed(2)}</span>
                     </div>
-                  ) : (
-                    <Link
-                      to={buttonLink}
-                      state={!isFree && plan ? { plan } : undefined}
-                      className={`w-full py-5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] text-center block transition-all ${
-                        isFree 
-                          ? 'bg-slate-800 text-white hover:bg-slate-700'
-                          : isPopular
-                            ? 'bg-gradient-to-r from-orange-500 to-pink-600 text-white shadow-xl shadow-orange-500/20 hover:scale-[1.02]'
-                            : 'bg-white text-slate-900 hover:bg-slate-100'
-                      }`}
-                    >
-                      {buttonText}
-                    </Link>
-                  )}
-
-                  <div className="mt-10 pt-8 border-t border-slate-800/50">
-                    <p className="text-slate-500 text-[10px] uppercase font-black tracking-widest mb-6">Inclusions</p>
-                    <ul className="space-y-4">
-                      {tier.features.map((feature, i) => {
-                        const isNo = feature.startsWith('❌')
-                        const text = feature.replace(/^[✅❌]\s*/, '')
-                        return (
-                          <li key={i} className={`flex items-start space-x-3 ${isNo ? 'opacity-30' : ''}`}>
-                            {isNo
-                              ? <span className="text-red-500 mt-1 flex-shrink-0 text-xs">✗</span>
-                              : <FiCheck className="text-orange-500 mt-1 flex-shrink-0" size={14} />
-                            }
-                            <span className={`text-xs font-bold leading-relaxed ${isNo ? 'text-slate-600 line-through' : 'text-slate-300'}`}>
-                              {text}
-                            </span>
-                          </li>
-                        )
-                      })}
-                    </ul>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span>Live coaching per week</span>
+                    <span className="font-black text-white">{customSessionsValue} x {customMinutesValue} min</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span>Weekly add-on</span>
+                    <span className="font-black text-white">${customWeeklyAddon.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span>Coaching Add-on ({billingCycle})</span>
+                    <div className="text-right">
+                      {billingCycle !== 'monthly' && (
+                        <span className="text-slate-500 line-through text-xs mr-2">
+                          ${(customWeeklyAddon * (billingCycle === 'quarterly' ? 13 : 52)).toFixed(2)}
+                        </span>
+                      )}
+                      <span className="font-black text-white">${customCycleAddon.toFixed(2)}</span>
+                      {billingCycle !== 'monthly' && (
+                        <p className="text-[10px] text-orange-400 font-bold">
+                          {billingCycle === 'quarterly' ? '10% DISCOUNT' : '20% DISCOUNT'}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
-              )
-            })}
+
+                <div className="mt-6 pt-6 border-t border-slate-800 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-1">{billingCycleLabels[billingCycle] || 'Total'}</p>
+                    <p className="text-4xl font-black text-white">${customCycleTotal.toFixed(2)}</p>
+                  </div>
+                  <Link
+                    to={isAuthenticated ? "/payment" : "/onboarding"}
+                    state={{ pkg: customCoachPlan }}
+                    className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-orange-500 to-pink-600 px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-white shadow-xl shadow-orange-500/20 transition-all hover:scale-[1.02]"
+                  >
+                    {activeCustomConfig ? 'Upgrade Custom Plan' : 'Continue to Custom Checkout'}
+                    <FiArrowRight />
+                  </Link>
+                </div>
+
+                </div>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      </section>
+        </section>
 
       {/* CTA */}
       <section className="relative py-24 overflow-hidden">

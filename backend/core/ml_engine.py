@@ -12,15 +12,17 @@ ENSEMBLE_SIZE = 12
 
 def _goal_bucket(goal: str | None) -> int:
     goal_text = (goal or '').lower()
-    if any(keyword in goal_text for keyword in ('lose', 'cut', 'fat loss', 'shred')):
-        return 0
-    if any(keyword in goal_text for keyword in ('gain', 'bulk', 'build', 'muscle')):
-        return 1
-    return 2
+    if any(keyword in goal_text for keyword in ('lose', 'cut', 'fat loss', 'shred', 'weight loss')):
+        return 0 # Fat Loss
+    if any(keyword in goal_text for keyword in ('gain', 'bulk', 'build', 'muscle', 'hypertrophy')):
+        return 1 # Muscle Gain / Hypertrophy
+    if any(keyword in goal_text for keyword in ('strength', 'power', 'max', 'heavy')):
+        return 2 # Strength / Power
+    return 3 # General / Maintenance
 
 
 def _synthetic_row(rng: Random):
-    goal_bucket = rng.choice([0, 1, 2])
+    goal_bucket = rng.choice([0, 1, 2, 3])
     completed = rng.randint(0, 24)
     streak = max(0, min(30, int(completed * 0.75) + rng.randint(-2, 4)))
     minutes = max(0, int(rng.gauss(55, 18) + completed * rng.uniform(18, 38)))
@@ -28,12 +30,21 @@ def _synthetic_row(rng: Random):
     weight_trend = round(rng.uniform(-4.5, 4.5), 1)
     body_fat = round(rng.uniform(8, 34), 1)
     consistency = round(completed / 24.0, 3)
+    
+    # New metrics: Volume and Trend
+    avg_vol = 5000 if goal_bucket == 1 else 3000
+    total_volume = max(0, int(rng.gauss(avg_vol, 1500) + completed * 200))
+    vol_trend = rng.uniform(-500, 1500)
 
     readiness = 45.0
     readiness += completed * 1.55
     readiness += streak * 1.35
     readiness += minutes / 18.0
     readiness += consistency * 14.0
+    
+    # Volume impact
+    if vol_trend > 2000: # Overtraining risk
+        readiness -= (vol_trend - 2000) / 100.0
 
     if goal_bucket == 0:
         readiness += (-weight_trend * 4.5)
@@ -41,6 +52,9 @@ def _synthetic_row(rng: Random):
     elif goal_bucket == 1:
         readiness += (weight_trend * 4.5)
         readiness += max(0.0, 16.0 - body_fat) * 0.25
+        readiness += (vol_trend / 500.0)
+    elif goal_bucket == 2:
+        readiness += (vol_trend / 300.0) # Strength cares about volume trend
     else:
         readiness += 3.0 if abs(weight_trend) <= 0.5 else -abs(weight_trend) * 1.1
 
@@ -48,7 +62,7 @@ def _synthetic_row(rng: Random):
     readiness += rng.gauss(0, 4.5)
     readiness = max(0.0, min(100.0, readiness))
 
-    features = [completed, calories, minutes, streak, weight_trend, body_fat, goal_bucket, consistency]
+    features = [completed, calories, minutes, streak, weight_trend, body_fat, goal_bucket, consistency, total_volume, vol_trend]
     return features, readiness
 
 
@@ -156,7 +170,11 @@ def _feature_vector(snapshot: dict) -> list[list[float]]:
     body_fat = float(snapshot.get('body_fat') if snapshot.get('body_fat') is not None else 20.0)
     goal_bucket = float(_goal_bucket(snapshot.get('goal')))
     consistency = completed / max(1.0, completed + 6.0)
-    return [[completed, calories, minutes, streak, weight_trend, body_fat, goal_bucket, consistency]]
+    
+    total_volume = float(snapshot.get('total_volume') or 0)
+    vol_trend = float(snapshot.get('vol_trend') or 0)
+    
+    return [[completed, calories, minutes, streak, weight_trend, body_fat, goal_bucket, consistency, total_volume, vol_trend]]
 
 
 def _signal_labels(snapshot: dict, score: float) -> list[str]:
@@ -164,67 +182,86 @@ def _signal_labels(snapshot: dict, score: float) -> list[str]:
     completed = int(snapshot.get('completed') or 0)
     streak = int(snapshot.get('streak') or 0)
     weight_trend = snapshot.get('weight_trend')
+    vol_trend = float(snapshot.get('vol_trend') or 0)
     goal_bucket = _goal_bucket(snapshot.get('goal'))
 
     if completed >= 4:
         labels.append('Consistency is high enough for progression.')
     elif completed == 0:
-        labels.append('The model is using synthetic priors because there is little training history yet.')
+        labels.append('Awaiting more training data to refine predictions.')
 
     if streak >= 5:
-        labels.append('Your streak is supporting adaptation.')
+        labels.append('Positive streak is supporting metabolic adaptation.')
     elif streak < 3:
-        labels.append('Recovery risk is elevated, so the model is conservative.')
+        labels.append('Recovery risk is elevated, model is conservative.')
+
+    if vol_trend > 1000:
+        labels.append('Significant volume increase detected (+Progressive Overload).')
+    elif vol_trend < -500:
+        labels.append('Volume drop detected. Re-evaluating stimulus intensity.')
 
     if weight_trend is not None:
         if goal_bucket == 0 and weight_trend <= 0:
             labels.append('Weight trend is aligned with fat-loss intent.')
         elif goal_bucket == 1 and weight_trend >= 0:
             labels.append('Weight trend is aligned with muscle-gain intent.')
-        elif abs(float(weight_trend)) > 0.5:
-            labels.append('Trend signal is noisy, so the model is softening the recommendation.')
 
-    if score >= 75:
-        labels.append('Readiness is high enough for progressive overload.')
+    if score >= 80:
+        labels.append('Neural readiness is optimal for a peak session.')
     elif score <= 45:
-        labels.append('The model is prioritizing recovery and workload control.')
+        labels.append('Prioritizing load stabilization and recovery.')
 
     return labels[:4]
 
 
 def _recommendation_for_score(score: float, snapshot: dict) -> tuple[str, str]:
-    goal_text = str(snapshot.get('goal') or '').lower()
-    if score >= 75:
-        if 'gain' in goal_text or 'build' in goal_text:
+    goal_bucket = _goal_bucket(snapshot.get('goal'))
+    vol_trend = float(snapshot.get('vol_trend') or 0)
+    
+    if score >= 80:
+        if goal_bucket == 1: # Hypertrophy
             return (
-                'push_progression',
-                'Synthetic ML signal is strong. Increase the main lift load by 2.5-5kg and keep protein intake high.',
+                'progressive_overload',
+                'Metabolic environment is optimal. Increase working sets by 1 or add 2.5kg to your primary lifts this session.',
             )
-        if 'lose' in goal_text or 'cut' in goal_text:
+        if goal_bucket == 2: # Strength
             return (
-                'accelerate_fat_loss',
-                'Synthetic ML signal is strong. Keep volume high, add one conditioning block, and preserve the current calorie deficit.',
+                'strength_peak',
+                'Neural readiness high. Aim for a new 3-5 rep max on your foundation lift and add 2 extra rest minutes.',
+            )
+        if goal_bucket == 0: # Fat Loss
+            return (
+                'metabolic_push',
+                'Signal strong. Maintain heavy load but reduce rest periods by 15 seconds to increase metabolic density.',
+            )
+        return ('push_limit', 'Excellent readiness. Push for +1 rep on all final sets to exceed current baseline.')
+
+    if score >= 60:
+        if vol_trend > 500:
+            return (
+                'adaptation_phase',
+                'Steady volume trend detected. Maintain current load to allow connective tissue to adapt to recent increases.',
             )
         return (
-            'push_progression',
-            'Synthetic ML signal is strong. Add a small progression to the next session and keep the current cadence.',
+            'steady_progression',
+            'Solid metrics. Add +1kg or 1 extra rep to your secondary movements while keeping primary lifts stable.',
         )
 
-    if score >= 55:
+    if score >= 45:
         return (
-            'maintain_course',
-            'Synthetic ML signal suggests you should keep the current split, maintain volume, and add one high-quality set.',
+            'stabilize_and_refine',
+            'Mixed signals detected. Keep load identical to last session but focus on eccentric control (3-second negatives).',
         )
 
-    if score >= 40:
+    if vol_trend > 2000:
         return (
-            'stabilize_load',
-            'Synthetic ML signal is mixed. Hold volume steady for one more week and prioritize sleep, hydration, and form.',
+            'forced_deload',
+            'Volume spike detected! Your volume trend is too aggressive. Reduce sets by 50% this session to prevent injury.',
         )
-
+        
     return (
-        'deload_recovery',
-        'Synthetic ML signal is weak. Reduce weekly volume by 10-15% and focus on recovery before pushing harder.',
+        'active_recovery',
+        'Neural recovery score is low. Swap today for a 45-minute Zone 2 cardio session and 10 minutes of mobility work.',
     )
 
 

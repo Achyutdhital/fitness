@@ -103,7 +103,7 @@ const AdminSEO = () => {
               <span>Search Engine Metadata</span>
            </h3>
            <Field label="Global Meta Keywords">
-             <Textarea value={settings?.meta_keywords || ''} onChange={e => setSettings({...settings, meta_keywords: e.target.value})} rows={3} placeholder="fitness, workout, diet plan, coach" />
+             <Textarea value={settings?.meta_keywords || ''} onChange={e => setSettings({...settings, meta_keywords: e.target.value})} rows={3} placeholder="fitness, workout, diet pkg, coach" />
              <p className="text-gray-500 text-[10px] mt-1 font-bold uppercase tracking-widest">Comma-separated terms</p>
            </Field>
            <Field label="Global Meta Description">

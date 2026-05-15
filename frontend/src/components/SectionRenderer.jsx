@@ -132,7 +132,7 @@ const SectionRenderer = ({ section }) => {
 
           <div className={`grid grid-cols-1 md:grid-cols-${section.columns || 3} gap-8`}>
             {section.section_items &&
-              section.section_items.map((plan) => (
+              section.section_items.map((pkg) => (
                 <div
                   key={plan.id}
                   className={`card p-8 relative transition-transform duration-300 hover:scale-105 ${

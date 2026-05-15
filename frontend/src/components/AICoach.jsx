@@ -30,7 +30,7 @@ const ELITE_TIER = {
   placeholder: 'Ask anything — form, periodisation, recovery...',
   starters: [
     'Review my last week and suggest adjustments',
-    'Design my recovery protocol for this week',
+    'Design my recovery pkg for this week',
     'What should my nutrition timing look like today?',
   ],
 }
@@ -48,16 +48,21 @@ const TIER_CONFIG = {
     color: 'text-purple-400',
     badge: 'Personalised',
     badgeColor: 'bg-purple-500/20 text-purple-300',
-    placeholder: 'Ask about your plan, goals, adjustments...',
+    placeholder: 'Ask about your pkg, goals, adjustments...',
     starters: [
-      'How should I adjust my plan if I\'m sore?',
+      'How should I adjust my pkg if I\'m sore?',
       'Is my nutrition on track for muscle gain?',
       'How do I break through a plateau?',
     ],
   },
   elite: ELITE_TIER,
-  custom: ELITE_TIER,
+  // Custom subscribers must be unlocked and use Elite-level chat experience.
+  custom: {
+    ...ELITE_TIER,
+    locked: false,
+  },
 }
+
 
 const AICoach = () => {
   const [open, setOpen] = useState(false)
@@ -69,9 +74,17 @@ const AICoach = () => {
   const inputRef = useRef(null)
 
   const { user, subscription } = useAuth()
-  const tier = subscription?.tier_details?.name?.toLowerCase() || 'free'
-  const normalizedTier = tier
+  const tier = (subscription?.tier_details?.name || 'free').toLowerCase()
+
+  // Some custom subscribers may not come through as `custom` depending on backend serializer.
+  // Treat any subscription that has `is_custom`, or carries a `custom_config`,
+  // or whose tier name contains "custom" as a custom subscription.
+  const normalizedTier = (subscription?.is_custom || subscription?.custom_config || tier.includes('custom'))
+    ? 'custom'
+    : tier
+
   const config = TIER_CONFIG[normalizedTier] || TIER_CONFIG.free
+
 
   // Load quota when widget opens
   useEffect(() => {

@@ -87,11 +87,11 @@ const CoachingPage = () => {
             <FiVideo className="text-slate-600 mx-auto mb-6" size={64} />
             <h2 className="text-2xl font-black text-white mb-4">Elite & Custom Exclusive</h2>
             <p className="text-slate-400 mb-8">
-              1-on-1 video coaching sessions are reserved for Elite and Custom protocols.
-              Upgrade your protocol to unlock direct access to our fitness experts.
+              1-on-1 video coaching sessions are reserved for Elite and Custom Packages.
+              Upgrade your pkg to unlock direct access to our fitness experts.
             </p>
             <a href="/subscriptions" className="px-8 py-4 bg-orange-500 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-orange-500/20 hover:bg-orange-600 transition-all inline-block">
-              Upgrade Protocol
+              Upgrade Package
             </a>
           </div>
         ) : (

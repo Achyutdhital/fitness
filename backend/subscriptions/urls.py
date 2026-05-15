@@ -4,7 +4,7 @@ from .views import SubscriptionTierViewSet, SubscriptionPlanViewSet, FeatureView
 
 router = DefaultRouter()
 router.register(r'tiers', SubscriptionTierViewSet, basename='tier')
-router.register(r'plans', SubscriptionPlanViewSet, basename='plan')
+router.register(r'packages', SubscriptionPlanViewSet, basename='package')
 router.register(r'features', FeatureViewSet, basename='feature')
 
 urlpatterns = router.urls

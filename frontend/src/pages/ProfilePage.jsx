@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { authAPI, paymentAPI } from '../services/api'
 import { 
@@ -52,6 +53,8 @@ const ProfilePage = () => {
     loadPayments()
   }, [user])
 
+  const navigate = useNavigate()
+
   const loadProfileDetails = async () => {
     try {
       const response = await authAPI.getProfileDetails()
@@ -82,7 +85,7 @@ const ProfilePage = () => {
       const result = await updateProfile(profileData)
       if (result.success) {
         await authAPI.updateProfileDetails({ goals: profileDetails.goals })
-        setMessage({ type: 'success', text: 'Protocol parameters updated successfully.' })
+        setMessage({ type: 'success', text: 'Package parameters updated successfully.' })
         await fetchUser()
       } else {
         setMessage({ type: 'error', text: result.error || 'Update failed' })
@@ -166,7 +169,7 @@ const ProfilePage = () => {
         <div className="flex space-x-2 mb-8 bg-slate-900/50 p-1 rounded-2xl w-fit border border-slate-800/50">
           {[
             { id: 'profile', label: 'Identity', icon: FiUser },
-            { id: 'subscription', label: 'Protocol', icon: FiCreditCard },
+            { id: 'subscription', label: 'Package', icon: FiCreditCard },
             { id: 'security', label: 'Security', icon: FiLock },
           ].map(tab => (
             <button
@@ -305,22 +308,45 @@ const ProfilePage = () => {
                 <div className="bg-gradient-to-r from-orange-500 to-pink-600 rounded-[2rem] p-10 text-white relative overflow-hidden group">
                   <FiZap className="absolute top-0 right-0 text-white/10 -mr-8 -mt-8 group-hover:scale-110 transition-transform duration-700" size={240} />
                   <div className="relative z-10">
-                    <p className="text-white/70 text-[10px] font-black uppercase tracking-widest mb-2">Current Active Protocol</p>
-                    <h3 className="text-5xl font-black mb-8 tracking-tight">{subscription?.tier_details?.name || 'Free Tier'}</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-                       <div>
-                         <p className="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1">Status</p>
-                         <p className="font-bold text-sm">{subscription?.status?.toUpperCase() || 'ACTIVE'}</p>
+                    <p className="text-white/70 text-[10px] font-black uppercase tracking-widest mb-2">Current Active Package</p>
+                    <h3 className="text-5xl font-black mb-8 tracking-tight">
+                      {subscription?.is_custom 
+                        ? `Custom (${subscription?.custom_config?.sessions_per_week}x${subscription?.custom_config?.session_duration_minutes}min)` 
+                        : subscription?.tier_details?.name || 'Free Tier'}
+                    </h3>
+                     <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+                        <div>
+                          <p className="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1">Status</p>
+                          <p className="font-bold text-sm flex items-center gap-2">
+                            {subscription?.status?.toUpperCase() || 'ACTIVE'}
+                            {subscription?.is_expiring_soon && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1">Expiration</p>
+                          <p className="font-bold text-sm">{subscription?.end_date ? new Date(subscription.end_date).toLocaleDateString() : 'INDIVIDUAL UNLOCKS'}</p>
+                        </div>
+                        <div>
+                          <p className="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1">Renewal Window</p>
+                          <p className={`font-bold text-[10px] ${subscription?.is_in_renewal_window ? 'text-green-400' : 'text-white/40'}`}>
+                            {subscription?.is_in_renewal_window ? 'OPEN (7D WINDOW)' : 'CLOSED'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1">Sessions</p>
+                          <p className="font-bold text-sm">
+                            {subscription?.is_custom 
+                              ? `${subscription?.custom_config?.sessions_per_week} / Week` 
+                              : `${subscription?.tier_details?.sessions_per_week || 0} / Week`}
+                          </p>
+                        </div>
+                     </div>
+                     {subscription?.is_expiring_soon && (
+                       <div className="mt-8 p-4 bg-black/20 border border-white/10 rounded-2xl flex items-center gap-3">
+                         <FiAlertCircle className="text-orange-400" />
+                         <p className="text-xs text-white/80">Your pkg is approaching its termination date. Ensure renewal within the window to avoid service interruption.</p>
                        </div>
-                       <div>
-                         <p className="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1">Renew Date</p>
-                         <p className="font-bold text-sm">{subscription?.end_date ? new Date(subscription.end_date).toLocaleDateString() : 'INDIVIDUAL UNLOCKS'}</p>
-                       </div>
-                       <div>
-                         <p className="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1">Sessions</p>
-                         <p className="font-bold text-sm">{subscription?.tier_details?.sessions_per_week || 0} / Week</p>
-                       </div>
-                    </div>
+                     )}
                   </div>
                 </div>
 
@@ -347,15 +373,15 @@ const ProfilePage = () => {
                     </div>
                   ) : (
                     <div className="p-12 text-center bg-slate-800/20 rounded-3xl border border-slate-800 border-dashed">
-                       <p className="text-slate-600 font-bold text-sm italic">No transaction records found in protocol.</p>
+                       <p className="text-slate-600 font-bold text-sm italic">No transaction records found in pkg.</p>
                     </div>
                   )}
                 </div>
 
-                <div className="flex gap-4">
-                   <button className="px-8 py-4 bg-white text-slate-900 rounded-2xl font-black uppercase tracking-widest text-xs transition-all hover:bg-slate-100 shadow-xl">Upgrade Protocol</button>
-                   <button className="px-8 py-4 bg-slate-800 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all hover:bg-slate-700 border border-slate-700">Cancel Cycle</button>
-                </div>
+                 <div className="flex gap-4">
+                   <button onClick={() => navigate('/profile/subscriptions')} className="px-8 py-4 bg-white text-slate-900 rounded-2xl font-black uppercase tracking-widest text-xs transition-all hover:bg-slate-100 shadow-xl">Manage Subscriptions</button>
+                   <button onClick={() => navigate('/profile/subscriptions')} className="px-8 py-4 bg-slate-800 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all hover:bg-slate-700 border border-slate-700">Cancel / Change</button>
+                 </div>
               </div>
             )}
 

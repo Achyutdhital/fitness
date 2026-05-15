@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { FiUser, FiLock, FiZap, FiArrowRight } from 'react-icons/fi'
+import { FcGoogle } from 'react-icons/fc'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const LoginPage = () => {
@@ -24,7 +25,7 @@ const LoginPage = () => {
     const result = await login(username, password)
     if (result.success) {
       if (selectedPlan) {
-        navigate('/payment', { state: { plan: selectedPlan } })
+        navigate('/payment', { state: { pkg: selectedPlan } })
       } else {
         navigate(from, { replace: true })
       }
@@ -70,6 +71,27 @@ const LoginPage = () => {
               </motion.div>
             )}
           </AnimatePresence>
+          
+          <div className="space-y-3 mb-8">
+            <motion.button
+              onClick={() => {
+                const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+                window.location.href = `${apiBase}/auth/oauth/google/start/`
+              }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="w-full flex items-center justify-center gap-4 px-6 py-4 bg-slate-800/50 border border-slate-700/50 rounded-2xl text-white font-black uppercase tracking-widest text-[10px] hover:bg-slate-800 transition-all shadow-xl shadow-black/20"
+            >
+              <FcGoogle size={20} />
+              Continue with Google
+            </motion.button>
+          </div>
+
+          <div className="flex items-center gap-4 mb-8">
+            <div className="h-px bg-slate-800 flex-1"></div>
+            <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Or Email</span>
+            <div className="h-px bg-slate-800 flex-1"></div>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
@@ -124,7 +146,13 @@ const LoginPage = () => {
           <div className="mt-10 pt-8 border-t border-slate-800/50 text-center">
             <p className="text-slate-500 text-sm font-bold">
               New to the platform?{' '}
-              <Link to="/register" className="text-orange-500 hover:text-orange-400 transition-colors">Apply Now</Link>
+              <Link 
+                to="/onboarding" 
+                state={{ pkg: selectedPlan }}
+                className="text-orange-500 hover:text-orange-400 transition-colors"
+              >
+                Apply Now
+              </Link>
             </p>
           </div>
         </div>

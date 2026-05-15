@@ -129,7 +129,7 @@ export const AuthProvider = ({ children }) => {
     ? {
         status: 'active',
         tier_details: { name: 'Elite', sessions_per_week: 3 },
-        plan: { billing_cycle: 'monthly', price: '99.99' },
+        pkg: { billing_cycle: 'monthly', price: '99.99' },
       }
     : subscription
 

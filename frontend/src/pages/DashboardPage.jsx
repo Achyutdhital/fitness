@@ -139,13 +139,13 @@ const DashboardPage = () => {
     let briefing = "Analyze your performance to unlock elite insights.";
 
     if (streak > 3) {
-      briefing = `Dominant streak! ${streak} days of pure discipline. Your recovery protocol is now top priority.`;
+      briefing = `Dominant streak! ${streak} days of pure discipline. Your recovery pkg is now top priority.`;
     } else if (completed_workouts > 10) {
       briefing = `Volume is king. You've conquered ${completed_workouts} sessions. Time to increase the mechanical tension.`;
     } else if (total_calories_burnt > 5000) {
       briefing = `Caloric furnace detected. You've burned over 5k kcal. Your metabolic flexibility is improving.`;
     } else {
-      briefing = `Initiate protocol. Your first milestone is 5 completed sessions. The journey to Elite starts now.`;
+      briefing = `Initiate pkg. Your first milestone is 5 completed sessions. The journey to Elite starts now.`;
     }
     
     setAiBriefing(briefing);
@@ -209,132 +209,66 @@ const DashboardPage = () => {
         animate="visible"
         className="container mx-auto px-4"
       >
-        {/* Live Tracking & Advanced Analysis */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-12">
-          {/* Live Workout Status */}
+        {/* Live Tracking Status (Moved to top as a priority banner) */}
+        {liveWorkout && (
           <motion.div 
             variants={itemVariants}
-            className="xl:col-span-1"
+            className="mb-12 bg-orange-500 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl shadow-orange-500/40"
           >
-            {liveWorkout ? (
-              <div className="bg-orange-500 rounded-[2.5rem] p-8 text-white relative overflow-hidden h-full shadow-2xl shadow-orange-500/40">
-                <div className="absolute -right-4 -top-4 w-32 h-32 bg-white/10 rounded-full blur-3xl animate-pulse" />
-                <div className="relative z-10">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center animate-bounce">
-                      <FiActivity size={24} />
-                    </div>
-                    <span className="text-[10px] font-black uppercase tracking-[0.3em]">Session Active</span>
-                  </div>
-                  <h3 className="text-3xl font-black mb-2">{liveWorkout.workout_title}</h3>
-                  <p className="text-white/80 text-xs font-bold mb-8 uppercase tracking-widest">Started at {new Date(liveWorkout.started_at).toLocaleTimeString()}</p>
-                  
-                  <Link 
-                    to={`/workouts/${liveWorkout.workout}`}
-                    className="w-full py-4 bg-white text-orange-500 rounded-xl font-black text-xs uppercase tracking-[0.2em] transition-all block text-center hover:scale-[1.02]"
-                  >
-                    Resume Performance log
-                  </Link>
+            <div className="absolute -right-4 -top-4 w-64 h-64 bg-white/10 rounded-full blur-3xl animate-pulse" />
+            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="flex items-center gap-6">
+                <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center animate-bounce">
+                  <FiActivity size={32} />
                 </div>
-              </div>
-            ) : (
-              <div className="bg-slate-900/50 backdrop-blur-xl rounded-[2.5rem] p-8 border border-slate-800/50 h-full flex flex-col justify-center items-center text-center">
-                <FiClock size={40} className="text-slate-700 mb-4" />
-                <p className="text-slate-500 text-xs font-black uppercase tracking-widest">No active session</p>
-                <p className="text-slate-600 text-[10px] mt-2">Start your protocol to begin live tracking</p>
-              </div>
-            )}
-          </motion.div>
-
-          {/* ML Analysis Engine */}
-          <motion.div 
-            variants={itemVariants}
-            className="xl:col-span-2 bg-gradient-to-br from-slate-900 to-[#1e293b] rounded-[2.5rem] p-8 border border-white/5 relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 p-8 text-blue-500/5 -mr-8 -mt-8">
-              <FiTrendingUp size={200} />
-            </div>
-            <div className="relative z-10">
-              <div className="flex items-center justify-between mb-8">
                 <div>
-                  <h2 className="text-2xl font-black text-white">Advanced Analysis Engine</h2>
-                  <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Personalized Performance Recommendations</p>
-                </div>
-                  <div className="px-4 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-[10px] font-black uppercase tracking-widest">
-                Active Guidance
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-2 h-2 bg-white rounded-full animate-ping" />
+                    <span className="text-[10px] font-black uppercase tracking-[0.3em]">Neural Link Active</span>
+                  </div>
+                  <h3 className="text-3xl font-black">{liveWorkout.workout_title}</h3>
+                  <p className="text-white/80 text-xs font-bold uppercase tracking-widest mt-1">Started at {new Date(liveWorkout.started_at).toLocaleTimeString()}</p>
                 </div>
               </div>
-
-              {analysisData ? (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-4">
-                    <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-2">Internal Diagnostics</p>
-                    {analysisData.analysis.map((item, i) => (
-                      <div key={i} className="flex items-center gap-3 text-white text-sm font-bold">
-                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                        {item}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="p-6 rounded-[2rem] bg-white/5 border border-white/10">
-                    <p className="text-orange-400 text-[10px] font-black uppercase tracking-widest mb-3">Suggested Solution</p>
-                    <p className="text-white text-base font-bold leading-relaxed mb-4">
-                      "{analysisData.suggested_solution}"
-                    </p>
-                    <div className="grid grid-cols-2 gap-3 mb-4">
-                      <div className="rounded-2xl bg-blue-500/10 border border-blue-500/20 p-3">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-blue-300 mb-1">Readiness Score</p>
-                        <p className="text-white text-xl font-black">{analysisData.model_score}/100</p>
-                      </div>
-                      <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-3">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-300 mb-1">Signal Strength</p>
-                        <p className="text-white text-xl font-black">{Math.round((analysisData.model_confidence || 0) * 100)}%</p>
-                      </div>
-                    </div>
-                    {analysisData.training_samples && (
-                      <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-3">
-                        Calibrated from {analysisData.training_samples.toLocaleString()} reference samples
-                      </p>
-                    )}
-                    {analysisData.supporting_signals?.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        {analysisData.supporting_signals.map((signal) => (
-                          <span key={signal} className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-slate-300 text-[10px] font-black uppercase tracking-widest">
-                            {signal}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    <div className="pt-4 border-t border-white/5">
-                      <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">Next Protocol Action</p>
-                      <p className="text-blue-400 text-xs font-black uppercase tracking-widest">{analysisData.next_step}</p>
-                      {stats?.next_best_action && (
-                        <p className="text-slate-400 text-xs mt-2 leading-relaxed">{stats.next_best_action}</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                  {insightCards.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {insightCards.map((card) => (
-                        <div key={card.label} className="bg-white/5 backdrop-blur rounded-2xl p-4 border border-white/5">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">{card.label}</p>
-                          <p className="text-white text-2xl font-black mb-1">{card.value}</p>
-                          <p className="text-slate-400 text-xs leading-relaxed">{card.detail}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="py-12 text-center text-slate-500">
-                  Initializing analysis engine... Complete at least one measurement and workout to unlock insights.
-                </div>
-              )}
+              
+              <Link 
+                to={`/workouts/${liveWorkout.workout}`}
+                className="px-12 py-5 bg-white text-orange-500 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all hover:scale-[1.05] shadow-xl"
+              >
+                Resume Performance log
+              </Link>
             </div>
           </motion.div>
-        </div>
+        )}
+
+        {/* Subscription Warning */}
+        {subscription?.is_expiring_soon && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 p-6 bg-gradient-to-r from-red-500/20 to-orange-500/20 border border-red-500/30 rounded-[2rem] flex flex-col md:flex-row items-center justify-between gap-6 backdrop-blur-xl"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-red-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-red-500/20">
+                <FiAlertCircle size={24} />
+              </div>
+              <div>
+                <h4 className="text-white font-black text-sm uppercase tracking-widest">Package Expiring Soon</h4>
+                <p className="text-red-400 text-xs font-bold mt-1">
+                  Your {subscription?.is_custom 
+                    ? `Custom (${subscription?.custom_config?.sessions_per_week}x${subscription?.custom_config?.session_duration_minutes}min)` 
+                    : subscription?.tier_details?.name} access ends on {new Date(subscription?.end_date).toLocaleDateString()}. Renew now to maintain progress.
+                </p>
+              </div>
+            </div>
+            <Link 
+              to="/subscriptions"
+              className="px-8 py-3 bg-white text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all hover:scale-[1.05]"
+            >
+              Renew pkg Now
+            </Link>
+          </motion.div>
+        )}
 
         {/* Elite AI Briefing */}
         <motion.div 
@@ -353,7 +287,7 @@ const DashboardPage = () => {
             </div>
             {isFreeTier ? (
               <Link to="/subscriptions" className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-orange-500/20 flex items-center gap-2">
-                <span>Unlock Basic Protocol</span>
+                <span>Unlock Basic Package</span>
                 <FiZap />
               </Link>
             ) : (
@@ -421,7 +355,9 @@ const DashboardPage = () => {
             </h1>
             <div className="flex items-center space-x-4">
               <span className="px-3 py-1 bg-slate-800 text-slate-400 rounded-lg text-[10px] font-black uppercase tracking-widest border border-slate-700">
-                {subscription?.tier_details?.name || 'Free'} PROTOCOL
+                {subscription?.is_custom 
+                  ? `Custom (${subscription?.custom_config?.sessions_per_week}x${subscription?.custom_config?.session_duration_minutes}min)` 
+                  : subscription?.tier_details?.name || 'Free'} Package
               </span>
               <div className="h-4 w-px bg-slate-800" />
               <div className="text-slate-400 text-sm font-bold">
@@ -670,7 +606,7 @@ const DashboardPage = () => {
               <div className="flex items-center justify-between mb-8">
                 <h2 className="text-2xl font-black text-white flex items-center gap-3">
                   <FiCalendar className="text-orange-500" />
-                  <span>Elite Protocol Schedule</span>
+                  <span>Elite pkg Schedule</span>
                 </h2>
               </div>
               <div className="grid grid-cols-7 gap-3">
@@ -723,6 +659,207 @@ const DashboardPage = () => {
              )}
            </motion.div>
         </div>
+
+        {/* Neural Analysis Engine - Moved to Bottom */}
+        <motion.div 
+          variants={itemVariants}
+          className="bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0f172a] rounded-[3rem] p-12 border border-white/5 relative overflow-hidden mb-12 group shadow-2xl"
+        >
+          {/* Animated Background Gradients */}
+          <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-500/10 blur-[150px] -z-10 rounded-full animate-pulse" />
+          <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-orange-500/5 blur-[150px] -z-10 rounded-full" />
+          
+          <div className="relative z-10">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8 mb-12">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                   <div className="px-3 py-1 bg-blue-500/20 border border-blue-500/30 rounded-full text-blue-400 text-[10px] font-black uppercase tracking-[0.2em]">
+                    {analysisData?.model_name || 'Neural Performance Engine'}
+                   </div>
+                   {analysisData?.is_premium_engine && (
+                     <div className="px-3 py-1 bg-orange-500/20 border border-orange-500/30 rounded-full text-orange-400 text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-1">
+                        <FiAward size={10} />
+                        <span>Elite Core</span>
+                     </div>
+                   )}
+                </div>
+                <h2 className="text-4xl md:text-5xl font-black text-white leading-tight">
+                  Neural <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-500">Transformation</span> Path
+                </h2>
+                <p className="text-slate-400 text-sm font-bold mt-2 max-w-xl">
+                  Our proprietary ML model continuously scans your bio-metrics and performance data to architect your optimal progression route.
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                   <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">Engine Status</p>
+                   <p className="text-emerald-400 text-xs font-black uppercase tracking-widest flex items-center justify-end gap-2">
+                     <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
+                     Live Tracking
+                   </p>
+                </div>
+                <div className="w-16 h-16 rounded-[2rem] bg-white/5 border border-white/10 flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform duration-500">
+                  <FiTrendingUp size={32} />
+                </div>
+              </div>
+            </div>
+
+            {analysisData ? (
+              analysisData.is_locked ? (
+                <div className="relative group/locked">
+                  {/* Blurred Preview Content */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 opacity-20 blur-xl pointer-events-none select-none">
+                    <div className="lg:col-span-5 space-y-8">
+                       <div className="bg-white/5 rounded-3xl p-8 border border-white/10">
+                          <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-6">Diagnostic Signals</p>
+                          <div className="space-y-6">
+                            {[1, 2, 3].map((i) => (
+                              <div key={i} className="flex items-start gap-4">
+                                <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20" />
+                                <div className="flex-grow">
+                                   <div className="h-4 bg-slate-800 rounded w-full mb-2" />
+                                   <div className="w-32 h-1 bg-slate-800 rounded-full" />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                       </div>
+                       <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-slate-800/40 rounded-2xl p-5 border border-slate-700/50 h-24" />
+                          <div className="bg-slate-800/40 rounded-2xl p-5 border border-slate-700/50 h-24" />
+                       </div>
+                    </div>
+                    <div className="lg:col-span-7 bg-gradient-to-br from-blue-600/20 to-indigo-600/20 rounded-3xl p-10" />
+                  </div>
+
+                  {/* Lock Overlay */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <motion.div 
+                      initial={{ scale: 0.9, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="max-w-md w-full bg-[#0f172a]/80 backdrop-blur-2xl p-10 rounded-[2.5rem] border border-white/10 text-center shadow-2xl relative overflow-hidden"
+                    >
+                      <div className="absolute -top-24 -left-24 w-48 h-48 bg-blue-500/20 blur-3xl rounded-full" />
+                      <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-orange-500/10 blur-3xl rounded-full" />
+                      
+                      <div className="relative z-10">
+                        <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-[2rem] flex items-center justify-center text-white mx-auto mb-8 shadow-lg shadow-blue-500/40">
+                           <FiZap size={36} />
+                        </div>
+                        <h3 className="text-2xl font-black text-white mb-4 uppercase tracking-tight">Advanced Neural Core Locked</h3>
+                        <p className="text-slate-400 text-sm font-bold leading-relaxed mb-8">
+                          {analysisData.message || "Upgrade to the Pro Protocol to unlock predictive metabolic modeling and advanced neural load analysis."}
+                        </p>
+                        
+                        <div className="space-y-3 mb-10">
+                           {(analysisData.preview_signals || ['Metabolic Profiling', 'Neural Modeling']).map((sig) => (
+                             <div key={sig} className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-blue-400">
+                                <FiCheck size={12} />
+                                <span>{sig}</span>
+                             </div>
+                           ))}
+                        </div>
+
+                        <Link 
+                          to="/subscriptions" 
+                          className="w-full py-5 bg-white text-slate-900 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all hover:bg-blue-500 hover:text-white block shadow-xl"
+                        >
+                           Unlock Pro Protocol
+                        </Link>
+                      </div>
+                    </motion.div>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+                  {/* Visual Data Column */}
+                  <div className="lg:col-span-5 space-y-8">
+                     <div className="bg-white/5 rounded-3xl p-8 border border-white/10 relative overflow-hidden group/card">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-50" />
+                        <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-6">Diagnostic Signals</p>
+                        <div className="space-y-6">
+                          {analysisData.analysis?.length > 0 ? analysisData.analysis.map((item, i) => (
+                            <div key={i} className="flex items-start gap-4">
+                              <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 flex-shrink-0">
+                                 {i === 0 ? <FiActivity size={14} /> : <FiZap size={14} />}
+                              </div>
+                              <div>
+                                 <p className="text-white text-sm font-bold leading-tight">{item}</p>
+                                 <div className="w-32 h-1 bg-slate-800 rounded-full mt-2 overflow-hidden">
+                                    <motion.div 
+                                      initial={{ width: 0 }}
+                                      animate={{ width: '85%' }}
+                                      transition={{ duration: 1, delay: i * 0.2 }}
+                                      className="h-full bg-blue-500" 
+                                    />
+                                 </div>
+                              </div>
+                            </div>
+                          )) : (
+                            <div className="text-slate-500 text-sm italic">Synchronizing with initial data points...</div>
+                          )}
+                        </div>
+                     </div>
+
+                     <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-slate-800/40 rounded-2xl p-5 border border-slate-700/50">
+                           <p className="text-[10px] font-black uppercase tracking-widest text-blue-300 mb-1">Model Score</p>
+                           <p className="text-white text-3xl font-black">{analysisData.model_score || 65}</p>
+                           <p className="text-slate-500 text-[10px] mt-1 uppercase tracking-widest font-black">Readiness / 100</p>
+                        </div>
+                        <div className="bg-slate-800/40 rounded-2xl p-5 border border-slate-700/50">
+                           <p className="text-[10px] font-black uppercase tracking-widest text-emerald-300 mb-1">Signal Confidence</p>
+                           <p className="text-white text-3xl font-black">{Math.round((analysisData.model_confidence || 0.85) * 100)}%</p>
+                           <p className="text-slate-500 text-[10px] mt-1 uppercase tracking-widest font-black">High Accuracy</p>
+                        </div>
+                     </div>
+                  </div>
+
+                  {/* Recommendation Column */}
+                  <div className="lg:col-span-7 flex flex-col">
+                     <div className="flex-grow bg-gradient-to-br from-blue-600/20 to-indigo-600/20 rounded-3xl p-10 border border-blue-500/30 shadow-inner">
+                        <div className="flex items-center gap-3 mb-6">
+                           <FiTarget className="text-orange-400" size={24} />
+                           <span className="text-orange-400 text-[10px] font-black uppercase tracking-[0.3em]">Neural Recommendation</span>
+                        </div>
+                        <h3 className="text-3xl font-black text-white mb-6 leading-tight">
+                           "{analysisData.suggested_solution}"
+                        </h3>
+                        
+                        <div className="space-y-4 mb-8">
+                           {analysisData.supporting_signals?.map((signal, i) => (
+                             <div key={i} className="flex items-center gap-3 text-slate-300 text-sm font-medium">
+                                <FiCheck className="text-emerald-400 flex-shrink-0" />
+                                <span>{signal}</span>
+                             </div>
+                           ))}
+                        </div>
+
+                        <div className="pt-8 border-t border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+                           <div>
+                              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">Next Protocol Action</p>
+                              <p className="text-blue-400 text-sm font-black uppercase tracking-[0.1em]">{analysisData.next_step}</p>
+                           </div>
+                           <Link 
+                             to="/workouts" 
+                             className="px-8 py-4 bg-white text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-500 hover:text-white transition-all shadow-xl"
+                           >
+                              Execute Phase
+                           </Link>
+                        </div>
+                     </div>
+                  </div>
+                </div>
+              )
+            ) : (
+              <div className="py-24 text-center">
+                 <div className="w-16 h-16 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin mx-auto mb-6" />
+                 <h3 className="text-xl font-black text-white mb-2 uppercase tracking-widest">Warming Up Neural Core</h3>
+                 <p className="text-slate-500 text-sm font-bold">Synchronizing metabolic history and performance snapshots...</p>
+              </div>
+            )}
+          </div>
+        </motion.div>
 
         <motion.div 
           variants={itemVariants}

@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext'
 import { motion } from 'framer-motion'
 import { FiUser, FiMail, FiLock, FiArrowRight } from 'react-icons/fi'
 import { FcGoogle } from 'react-icons/fc'
-import { FaFacebook } from 'react-icons/fa'
 
 const EnhancedSignupPage = () => {
   const location = useLocation()
@@ -73,23 +72,38 @@ const EnhancedSignupPage = () => {
     setSuccess('')
 
     try {
-      const registrationData = {
-        ...formData,
-        // Include onboarding data if available
-        ...(parsedData && {
-          gender: parsedData.gender,
-          age: parsedData.age,
-          height_ft: parsedData.height_ft,
-          height_in: parsedData.height_in,
-          height_cm: parsedData.height_cm,
-          height_m: parsedData.height_m,
-          height_unit: parsedData.height_unit,
-          weight: parsedData.weight,
-          weight_unit: parsedData.weight_unit,
-          fitness_goal: parsedData.goal,
-          activity_level: parsedData.activity_level,
-          dietary_preference: parsedData.dietary_preference,
-        }),
+      const registrationData = { ...formData }
+
+      // Include onboarding data if available, ensuring numbers are properly parsed
+      if (parsedData) {
+        const mapping = {
+          gender: 'gender',
+          age: 'age',
+          height_ft: 'height_ft',
+          height_in: 'height_in',
+          height_cm: 'height_cm',
+          height_m: 'height_m',
+          height_unit: 'height_unit',
+          weight: 'weight',
+          weight_unit: 'weight_unit',
+          goal: 'fitness_goal',
+          activity_level: 'activity_level',
+          dietary_preference: 'dietary_preference',
+        }
+
+        Object.entries(mapping).forEach(([key, field]) => {
+          const val = parsedData[key]
+          if (val !== undefined && val !== null && val !== '') {
+            // Convert to number if the field expects it
+            if (['age', 'height_ft', 'height_in'].includes(field)) {
+              registrationData[field] = parseInt(val)
+            } else if (['height_cm', 'height_m', 'weight'].includes(field)) {
+              registrationData[field] = parseFloat(val)
+            } else {
+              registrationData[field] = val
+            }
+          }
+        })
       }
 
       const result = await register(registrationData)
@@ -101,7 +115,14 @@ const EnhancedSignupPage = () => {
         setTimeout(async () => {
           const loginResult = await login(formData.username, formData.password)
           if (loginResult.success) {
-            navigate('/dashboard')
+            const pkg = location.state?.plan || parsedData?.plan
+            const from = location.state?.from?.pathname || '/dashboard'
+            
+            if (pkg) {
+              navigate('/payment', { state: { pkg } })
+            } else {
+              navigate(from, { replace: true })
+            }
           }
         }, 1500)
       } else {
@@ -119,14 +140,12 @@ const EnhancedSignupPage = () => {
 
   const handleGoogleSignup = () => {
     const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
-    const state = btoa(JSON.stringify(parsedData || {}))
+    const stateObj = {
+      ...(parsedData || {}),
+      pkg: location.state?.plan || null
+    }
+    const state = btoa(JSON.stringify(stateObj))
     window.location.href = `${apiBase}/auth/oauth/google/start/?state=${encodeURIComponent(state)}`
-  }
-
-  const handleFacebookSignup = () => {
-    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
-    const state = btoa(JSON.stringify(parsedData || {}))
-    window.location.href = `${apiBase}/auth/oauth/facebook/start/?state=${encodeURIComponent(state)}`
   }
 
   return (
@@ -155,20 +174,10 @@ const EnhancedSignupPage = () => {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               type="button"
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-700/30 border border-slate-600 rounded-lg text-white font-semibold hover:bg-slate-700/50 transition-all"
+              className="w-full flex items-center justify-center gap-4 px-6 py-4 bg-slate-900/50 border border-slate-700/50 rounded-2xl text-white font-black uppercase tracking-widest text-[10px] hover:bg-slate-800 transition-all shadow-xl shadow-black/20"
             >
               <FcGoogle size={20} />
               Sign up with Google
-            </motion.button>
-            <motion.button
-              onClick={handleFacebookSignup}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              type="button"
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-700/30 border border-slate-600 rounded-lg text-white font-semibold hover:bg-slate-700/50 transition-all"
-            >
-              <FaFacebook size={20} />
-              Sign up with Facebook
             </motion.button>
           </div>
 

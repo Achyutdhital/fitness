@@ -187,7 +187,7 @@ const WorkoutsPage = () => {
         {loading ? (
           <div className="flex flex-col items-center justify-center min-h-[400px]">
             <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-orange-500 mb-4"></div>
-            <p className="text-gray-500 font-bold uppercase tracking-widest text-[10px]">Assembling Protocol...</p>
+            <p className="text-gray-500 font-bold uppercase tracking-widest text-[10px]">Assembling pkg...</p>
           </div>
         ) : viewType === 'library' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">

@@ -52,7 +52,6 @@ const Navbar = () => {
 
         {/* Desktop Nav */}
         <div className="hidden md:flex items-center space-x-6">
-          {navLink('/subscriptions', 'Programs')}
           {isAuthenticated && (
             <>
               {navLink('/workouts', 'Workouts')}
@@ -135,7 +134,7 @@ const Navbar = () => {
           ) : (
             <>
               <Link to="/login" className="text-gray-300 hover:text-orange-400 transition text-sm font-medium">Login</Link>
-              <Link to="/register" className="btn btn-primary text-sm py-2 px-5">Start Free Trial</Link>
+              <Link to="/onboarding" className="btn btn-primary text-sm py-2 px-5">Start Free Trial</Link>
             </>
           )}
         </div>
@@ -149,8 +148,7 @@ const Navbar = () => {
       {/* Mobile Menu */}
       {isOpen && (
         <div className="md:hidden bg-gray-900 border-t border-gray-800">
-          <div className="container py-4 space-y-3">
-            {navLink('/subscriptions', 'Programs')}
+            <div className="container py-4 space-y-3">
             {isAuthenticated && (
               <>
                 {navLink('/workouts', 'Workouts')}
@@ -169,7 +167,7 @@ const Navbar = () => {
             {!isAuthenticated && (
               <>
                 {navLink('/login', 'Login')}
-                <Link to="/register" className="block btn btn-primary text-center text-sm" onClick={() => setIsOpen(false)}>
+                <Link to="/onboarding" className="block btn btn-primary text-center text-sm" onClick={() => setIsOpen(false)}>
                   Start Free Trial
                 </Link>
               </>

@@ -8,6 +8,53 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Lightweight error overlay: displays uncaught errors and rejected promises
+      (function(){
+        function ensureOverlay(){
+          var o = document.getElementById('js-error-overlay');
+          if(!o){
+            o = document.createElement('div');
+            o.id = 'js-error-overlay';
+            Object.assign(o.style,{
+              position: 'fixed',
+              top: '0',
+              left: '0',
+              right: '0',
+              background: '#b91c1c',
+              color: '#fff',
+              padding: '12px',
+              zIndex: 2147483647,
+              fontFamily: 'monospace',
+              whiteSpace: 'pre-wrap',
+              maxHeight: '40vh',
+              overflow: 'auto',
+            });
+            document.addEventListener('DOMContentLoaded', function(){ document.body.appendChild(o) });
+            if(document.body) document.body.appendChild(o);
+          }
+          return o;
+        }
+
+        window.addEventListener('error', function(evt){
+          try{
+            var overlay = ensureOverlay();
+            var msg = evt.message || (evt.error && evt.error.message) || String(evt.error || evt);
+            overlay.textContent = 'JavaScript Error: ' + msg + '\n\nSee DevTools Console for stack.';
+            console.error('Captured by overlay:', evt.error || evt.message, evt.error || evt);
+          }catch(e){console.error('Overlay error', e)}
+        });
+
+        window.addEventListener('unhandledrejection', function(evt){
+          try{
+            var overlay = ensureOverlay();
+            var reason = evt.reason && (evt.reason.message || String(evt.reason)) || String(evt.reason);
+            overlay.textContent = 'Unhandled Promise Rejection: ' + reason + '\n\nSee DevTools Console for details.';
+            console.error('UnhandledRejection captured by overlay:', evt.reason);
+          }catch(e){console.error('Overlay error', e)}
+        });
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

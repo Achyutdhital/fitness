@@ -16,8 +16,8 @@ class SubscriptionPlanDetailSerializer(SubscriptionPlanSerializer):
         fields = SubscriptionPlanSerializer.Meta.fields + ['stripe_price_id', 'updated_at']
 
 class SubscriptionTierSerializer(serializers.ModelSerializer):
-    plans = SubscriptionPlanSerializer(many=True, read_only=True)
+    packages = SubscriptionPlanSerializer(many=True, read_only=True, source='plans')
     
     class Meta:
         model = SubscriptionTier
-        fields = ['id', 'name', 'description', 'features', 'sessions_per_week', 'priority', 'plans']
+        fields = ['id', 'name', 'description', 'features', 'sessions_per_week', 'video_sessions_per_month', 'custom_hourly_rate', 'priority', 'packages']

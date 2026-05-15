@@ -199,26 +199,49 @@ class TierSerializer(serializers.ModelSerializer):
     class Meta:
         from subscriptions.models import SubscriptionTier
         model = SubscriptionTier
-        fields = ['id', 'name', 'description', 'features', 'sessions_per_week']
+        fields = ['id', 'name', 'description', 'features', 'sessions_per_week', 'video_sessions_per_month', 'custom_hourly_rate']
 
 class UserSubscriptionSerializer(serializers.ModelSerializer):
     subscription_plan = serializers.SerializerMethodField()
-    tier_details = TierSerializer(source='tier', read_only=True)
+    tier_details = serializers.SerializerMethodField()
 
     class Meta:
         model = UserSubscription
-        fields = ['id', 'subscription_plan', 'tier', 'tier_details', 'status', 'start_date', 'end_date', 'created_at']
+        fields = ['id', 'subscription_plan', 'tier', 'tier_details', 'status', 'is_custom', 'custom_config', 'start_date', 'end_date', 'is_expiring_soon', 'is_in_renewal_window', 'created_at']
         read_only_fields = ['id', 'created_at']
 
     def get_subscription_plan(self, obj):
         if obj.subscription_plan:
+            name = obj.subscription_plan.name
+            if obj.is_custom:
+                name = f"Custom {name}"
             return {
                 'id': str(obj.subscription_plan.id),
-                'name': obj.subscription_plan.name,
+                'name': name,
                 'price': str(obj.subscription_plan.price),
                 'billing_cycle': obj.subscription_plan.billing_cycle,
             }
         return None
+
+    def get_tier_details(self, obj):
+        # Backward-compatible fallback: if legacy rows have null tier,
+        # derive tier details from subscription_plan.tier.
+        tier = obj.tier or getattr(obj.subscription_plan, 'tier', None)
+        if not tier:
+            return None
+        
+        tier_data = TierSerializer(tier).data
+        
+        # If custom subscription, enhance tier_data with custom config details
+        if obj.is_custom and obj.custom_config:
+            sessions_per_week = obj.custom_config.get('sessions_per_week', 0)
+            session_duration_minutes = obj.custom_config.get('session_duration_minutes', 0)
+            # Update name to display custom config
+            tier_data['name'] = f"Custom ({sessions_per_week}x{session_duration_minutes}min)"
+            tier_data['is_custom'] = True
+            tier_data['custom_config'] = obj.custom_config
+        
+        return tier_data
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):

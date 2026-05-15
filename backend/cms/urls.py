@@ -10,6 +10,7 @@ from .views import (
 router = DefaultRouter()
 router.register(r'blog/categories', BlogCategoryViewSet, basename='blog-category')
 router.register(r'blog/posts', BlogPostViewSet, basename='blog-post')
+router.register(r'blog', BlogPostViewSet, basename='blog')
 router.register(r'contact', ContactMessageViewSet, basename='contact-message')
 router.register(r'pages', DynamicPageViewSet, basename='dynamic-page')
 router.register(r'social-links', SocialMediaLinksViewSet, basename='social-links')

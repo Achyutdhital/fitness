@@ -5,7 +5,7 @@ const SEO = ({ title, description, keywords, image, url, type = 'website' }) => 
   const siteName = 'FitCoachPro'
   const fullTitle = title ? `${title} | ${siteName}` : siteName
   const defaultDesc = 'Transform your body and mind with FitCoachPro - The ultimate fitness subscription platform.'
-  const defaultKeywords = 'fitness, workout, diet plan, coach, personal trainer, health'
+  const defaultKeywords = 'fitness, workout, diet pkg, coach, personal trainer, health'
 
   return (
     <Helmet>

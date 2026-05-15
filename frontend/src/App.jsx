@@ -11,8 +11,8 @@ import LandingPage from './pages/LandingPage'
 import OnboardingPage from './pages/OnboardingPage'
 import OAuthCallbackPage from './pages/OAuthCallbackPage'
 import LoginPage from './pages/LoginPage'
-import RegisterPage from './pages/RegisterPage'
 import EnhancedSignupPage from './pages/SignupPageNew'
+import { Navigate } from 'react-router-dom'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import SubscriptionsPage from './pages/SubscriptionsPage'
@@ -58,7 +58,7 @@ function App() {
                       {/* Public */}
                       <Route path="/" element={<LandingPage />} />
                       <Route path="/login" element={<LoginPage />} />
-                      <Route path="/register" element={<RegisterPage />} />
+                      <Route path="/register" element={<Navigate to="/onboarding" replace />} />
                       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                       <Route path="/reset-password/:uid/:token" element={<ResetPasswordPage />} />
                       <Route path="/subscriptions" element={<SubscriptionsPage />} />
@@ -74,6 +74,7 @@ function App() {
                       <Route path="/meal-plans" element={<ProtectedRoute><MealPlansPage /></ProtectedRoute>} />
                       <Route path="/payment" element={<ProtectedRoute><PaymentPage /></ProtectedRoute>} />
                       <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+                      <Route path="/profile/subscriptions" element={<ProtectedRoute><SubscriptionsPage /></ProtectedRoute>} />
                       <Route path="/achievements" element={<ProtectedRoute><AchievementsPage /></ProtectedRoute>} />
                       <Route path="/challenges" element={<ProtectedRoute><ChallengesPage /></ProtectedRoute>} />
                       <Route path="/measurements" element={<ProtectedRoute><MeasurementsPage /></ProtectedRoute>} />

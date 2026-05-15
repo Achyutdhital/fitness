@@ -7,7 +7,7 @@ class SubscriptionPlanInline(admin.TabularInline):
 
 @admin.register(SubscriptionTier)
 class SubscriptionTierAdmin(admin.ModelAdmin):
-    list_display = ['name', 'priority', 'sessions_per_week', 'created_at']
+    list_display = ['name', 'priority', 'sessions_per_week', 'custom_hourly_rate', 'created_at']
     list_editable = ['priority']
     inlines = [SubscriptionPlanInline]
 

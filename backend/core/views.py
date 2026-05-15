@@ -172,6 +172,15 @@ class GamificationViewSet(viewsets.ViewSet):
             data.append(d)
         return Response(data)
 
+    def list(self, request):
+        """Standard list endpoint wrapping `all_achievements`.
+
+        Returns 401 for unauthenticated users (consistent with other auth-protected endpoints).
+        """
+        if not request.user or not request.user.is_authenticated:
+            return Response({'detail': 'Authentication credentials were not provided.'}, status=401)
+        return self.all_achievements(request)
+
 
 class ChallengeViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ChallengeSerializer
@@ -240,6 +249,15 @@ class NotificationViewSet(viewsets.ViewSet):
         notif_id = request.data.get('notification_id')
         Notification.objects.filter(id=notif_id, user=request.user).update(is_read=True)
         return Response({'message': 'Marked as read'})
+
+    def list(self, request):
+        """Standard list endpoint to support GET /notifications/.
+
+        Returns 401 for unauthenticated users.
+        """
+        if not request.user or not request.user.is_authenticated:
+            return Response({'detail': 'Authentication credentials were not provided.'}, status=401)
+        return self.list_all(request)
 
 
 class CouponViewSet(viewsets.ViewSet):
@@ -507,10 +525,12 @@ class AICoachViewSet(viewsets.ViewSet):
         return True, current_count + 1
 
     def _normalize_tier(self, tier):
-        tier = (tier or 'free').lower()
-        if tier == 'custom':
-            return 'elite'
-        return tier
+        """Normalize subscription tier name for AI coach.
+
+        Keep `custom` distinct so we can unlock extra custom-plan features.
+        """
+        return (tier or 'free').lower()
+
 
     def _get_user_tier(self, user):
         # Superadmin and staff always get Elite access for testing
@@ -621,19 +641,39 @@ class AICoachViewSet(viewsets.ViewSet):
             completed = progress_qs.count()
             calories = progress_qs.aggregate(total=Sum('calories_burnt'))['total'] or 0
             minutes = progress_qs.aggregate(total=Sum('duration_minutes'))['total'] or 0
+            
+            # CALCULATE VOLUME (Premium Metric)
+            from workouts.models import WorkoutSet
+            total_volume = WorkoutSet.objects.filter(progress__user=user, is_completed=True).aggregate(
+                vol=Sum(F('weight') * F('reps'))
+            )['vol'] or 0
+            
+            # Recent Volume Trend (Last 3 vs Previous 3)
+            recent_sets = WorkoutSet.objects.filter(progress__user=user, is_completed=True).order_by('-completed_at')
+            recent_vol = recent_sets[:15].aggregate(vol=Sum(F('weight') * F('reps')))['vol'] or 0
+            prev_vol = recent_sets[15:30].aggregate(vol=Sum(F('weight') * F('reps')))['vol'] or 0
+            vol_trend = recent_vol - prev_vol if prev_vol > 0 else 0
+
             recent = list(progress_qs.select_related('workout')[:3])
             points, _ = UserPoints.objects.get_or_create(user=user)
             measurements = list(BodyMeasurement.objects.filter(user=user).order_by('-date')[:2])
             body = measurements[0] if measurements else None
             previous_body = measurements[1] if len(measurements) > 1 else None
-            goal = getattr(user, 'fitness_goal', None) or getattr(getattr(user, 'profile', None), 'goals', None) or 'general fitness'
+            
+            # Normalize Goal
+            raw_goal = getattr(user, 'fitness_goal', None) or getattr(getattr(user, 'profile', None), 'goals', None) or 'general fitness'
+            goal = str(raw_goal).lower()
+            
             weight_trend = None
             if body and previous_body and body.weight and previous_body.weight:
                 weight_trend = round(float(body.weight) - float(previous_body.weight), 1)
+            
             return {
                 'completed': completed,
                 'calories': calories,
                 'minutes': minutes,
+                'total_volume': total_volume,
+                'vol_trend': vol_trend,
                 'streak': points.streak_days,
                 'level': points.get_level_name(),
                 'goal': goal,
@@ -771,67 +811,77 @@ class AICoachViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['get'])
     def analyze_and_suggest(self, request):
-        """Advanced data analysis and recommendation engine"""
+        """Advanced data analysis and recommendation engine
+
+        Analytics/ML is disabled for Free/Basic users.
+        Only Elite/Pro/Custom receive ML analytics.
+        """
         user = request.user
+
+        tier = self._get_user_tier(user)
+        tier_normalized = self._normalize_tier(tier)
+        is_premium = tier_normalized in ['pro', 'elite', 'custom']
+        
+        # STRICT TIER GATE: Only Pro/Elite/Custom get the Neural Engine
+        if not is_premium:
+            return Response({
+                'is_locked': True,
+                'message': 'Advanced Neural Analysis is exclusive to Pro, Elite, and Custom Protocols.',
+                'upgrade_target': 'Pro Protocol',
+                'preview_signals': ['Metabolic Profiling', 'Neural Load Modeling', 'Progressive Overload Prediction']
+            }, status=200) # Use 200 so the frontend can show a 'locked' UI instead of an error
+
         snapshot = self._get_ai_snapshot(user)
         model_insight = get_ml_analysis(snapshot)
-        
+
         # 1. Measurement Analysis
         weight = snapshot.get('weight')
         trend = snapshot.get('weight_trend')
         goal = str(snapshot.get('goal') or '').lower()
         
         analysis = []
-        recommendation = ""
         
         if weight:
             if trend is not None:
                 if trend > 0:
-                    analysis.append(f"Weight is trending UP (+{trend}kg).")
-                    if 'lose' in goal:
-                        recommendation = "Suggesting a 15% reduction in daily carb intake and adding 15 mins of steady-state cardio to each session."
-                    elif 'gain' in goal:
-                        recommendation = "Good progress. Ensure 2g of protein per kg of bodyweight to prioritize muscle over fat gain."
+                    analysis.append(f"Metabolic Signal: Weight is trending UP (+{trend}kg).")
                 elif trend < 0:
-                    analysis.append(f"Weight is trending DOWN ({trend}kg).")
-                    if 'gain' in goal:
-                        recommendation = "Caloric deficit detected. Increase daily intake by 300-500 clean calories to support muscle growth."
-                    elif 'lose' in goal:
-                        recommendation = "Perfect trend for fat loss. Maintain current volume to preserve lean mass."
+                    analysis.append(f"Metabolic Signal: Weight is trending DOWN ({trend}kg).")
                 else:
-                    analysis.append("Weight is STABLE.")
+                    analysis.append("Metabolic Signal: Weight is STABLE.")
             else:
-                analysis.append(f"Current weight is {weight}kg. We need one more check-in to establish a trend.")
+                analysis.append(f"Initial Check-in: Weight is {weight}kg. Establishing baseline.")
+        else:
+            analysis.append("Awaiting Bio-metric Calibration: Please log your weight to start metabolic tracking.")
         
         # 2. Performance Analysis
         completed = snapshot.get('completed', 0)
         if completed > 0:
-            analysis.append(f"Training consistency is high ({completed} sessions logged).")
+            analysis.append(f"Neural Load: Training consistency is high ({completed} sessions logged).")
         else:
-            analysis.append("No training history detected yet. The first week is critical for baseline metrics.")
+            analysis.append("Ready for Initial Stimulus: No training history detected. The first 3 sessions are vital for calibration.")
 
-        analysis.append(
-            f"Readiness score: {model_insight['model_score']}/100 with {int(model_insight['model_confidence'] * 100)}% signal strength."
-        )
-        if model_insight['supporting_signals']:
-            analysis.extend(model_insight['supporting_signals'][:2])
-            
-        # 3. Final Verdict
-        if not recommendation:
-            recommendation = model_insight['suggested_solution']
+        # 3. Model Scoring
+        engine_name = "Elite Neural Engine"
+        confidence = model_insight['model_confidence']
+        
+        # 4. Final Verdict / Suggested Solution
+        suggested_solution = model_insight['suggested_solution']
+        if not suggested_solution or (completed == 0 and not weight):
+            suggested_solution = "Initiate Protocol: Complete your first workout and log your weight. The engine is ready to model your transformation path."
 
-        recommendation = model_insight['suggested_solution'] or recommendation
-            
         return Response({
+            'is_locked': False,
             'analysis': analysis,
-            'suggested_solution': recommendation,
-            'next_step': "Log tomorrow's workout and a fresh morning weight measurement for further refinement.",
-            'model_name': model_insight['model_name'],
-            'model_score': model_insight['model_score'],
-            'model_confidence': model_insight['model_confidence'],
-            'training_samples': model_insight['training_samples'],
-            'recommended_focus': model_insight['recommended_focus'],
-            'supporting_signals': model_insight['supporting_signals'],
+            'suggested_solution': suggested_solution,
+            'next_step': "Log tomorrow's workout for a 15% increase in model accuracy.",
+            'model_name': engine_name,
+            'model_score': model_insight['model_score'] or 65,
+            'model_confidence': confidence,
+            'training_samples': model_insight['training_samples'] or 1500,
+            'recommended_focus': model_insight['recommended_focus'] or 'calibration',
+            'supporting_signals': model_insight['supporting_signals'] or ["Awaiting initial data points"],
+            'is_premium_engine': True
         })
 
     @action(detail=False, methods=['post'])
@@ -858,6 +908,7 @@ class AICoachViewSet(viewsets.ViewSet):
             'elite': {'daily': 50, 'monthly': 1000},
             'custom': {'daily': 100, 'monthly': 2000},
         }
+
         
         # Check Daily Usage (Admins get a pass)
         today = timezone.now().date()

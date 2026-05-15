@@ -169,16 +169,40 @@ class UserSubscription(models.Model):
         ],
         default='trial'
     )
+    is_custom = models.BooleanField(default=False)
+    custom_config = models.JSONField(null=True, blank=True)
     start_date = models.DateTimeField(auto_now_add=True)
     end_date = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    @property
+    def is_expiring_soon(self):
+        """Check if subscription expires within 7 days"""
+        if not self.end_date:
+            return False
+        from django.utils import timezone
+        diff = self.end_date - timezone.now()
+        return 0 <= diff.days <= 7
+
+    @property
+    def is_in_renewal_window(self):
+        """Check if user can renew (7 days before or 7 days after expiration)"""
+        if not self.end_date:
+            return True # If no end date (e.g. trial/new), allow subscribing
+        from django.utils import timezone
+        now = timezone.now()
+        diff = now - self.end_date
+        # diff.days > 0 means it's expired
+        # abs(diff.days) <= 7 means it's within the 1 week window
+        return abs(diff.days) <= 7
+
     class Meta:
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.user.username} - {self.subscription_plan}"
+        prefix = "[Custom] " if self.is_custom else ""
+        return f"{self.user.username} - {prefix}{self.subscription_plan}"
 
 
 class UserProfile(models.Model):

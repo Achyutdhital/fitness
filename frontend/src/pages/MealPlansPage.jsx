@@ -95,27 +95,27 @@ const MealPlansPage = () => {
     }
   }
 
-  const isPlanLocked = (plan) => {
+  const isPlanLocked = (pkg) => {
     if (!isFreeTier) return false
-    if (plan.difficulty_level === 'beginner') return false
+    if (pkg.difficulty_level === 'beginner') return false
     return true // Simplified for demo
   }
 
   const filteredPlans = useMemo(() => {
-    return mealPlans.filter((plan) => {
-      const matchesSearch = !search || plan.title?.toLowerCase().includes(search.toLowerCase()) || plan.description?.toLowerCase().includes(search.toLowerCase())
-      const matchesDiet = !filters.dietary_type || plan.dietary_type === filters.dietary_type
-      const matchesDifficulty = !filters.difficulty_level || plan.difficulty_level === filters.difficulty_level
+    return mealPlans.filter((pkg) => {
+      const matchesSearch = !search || pkg.title?.toLowerCase().includes(search.toLowerCase()) || pkg.description?.toLowerCase().includes(search.toLowerCase())
+      const matchesDiet = !filters.dietary_type || pkg.dietary_type === filters.dietary_type
+      const matchesDifficulty = !filters.difficulty_level || pkg.difficulty_level === filters.difficulty_level
       return matchesSearch && matchesDiet && matchesDifficulty
     })
   }, [mealPlans, search, filters])
 
-  const openPlan = (plan) => {
-    if (isPlanLocked(plan)) {
+  const openPlan = (pkg) => {
+    if (isPlanLocked(pkg)) {
       // Don't open if locked, just show the card interaction
       return
     }
-    setSelectedPlan(plan)
+    setSelectedPlan(pkg)
   }
 
   return (
@@ -185,28 +185,28 @@ const MealPlansPage = () => {
           </div>
         ) : filteredPlans.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredPlans.map((plan) => {
-              const locked = isPlanLocked(plan)
+            {filteredPlans.map((pkg) => {
+              const locked = isPlanLocked(pkg)
               
               return (
                 <button
-                  key={plan.id}
-                  onClick={() => openPlan(plan)}
+                  key={pkg.id}
+                  onClick={() => openPlan(pkg)}
                   className="group text-left bg-gray-800/40 backdrop-blur-sm rounded-[2rem] overflow-hidden border border-gray-700 hover:border-orange-500/50 transition-all duration-300 hover:-translate-y-1 flex flex-col h-full"
                 >
                   <div className="relative h-56 overflow-hidden">
                     <img
-                      src={plan.image}
-                      alt={plan.title}
+                      src={pkg.image}
+                      alt={pkg.title}
                       className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ${locked ? 'blur-sm grayscale brightness-50' : ''}`}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent opacity-60" />
                     
                     <div className="absolute top-4 left-4 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest text-white bg-gradient-to-r from-orange-500 to-pink-500 capitalize">
-                      {plan.difficulty_level || 'plan'}
+                      {pkg.difficulty_level || 'plan'}
                     </div>
-                    <div className={`absolute top-4 right-4 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${getDietBadgeColor(plan.dietary_type)}`}>
-                      {plan.dietary_type?.replace('_', ' ') || 'regular'}
+                    <div className={`absolute top-4 right-4 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${getDietBadgeColor(pkg.dietary_type)}`}>
+                      {pkg.dietary_type?.replace('_', ' ') || 'regular'}
                     </div>
 
                     {locked && (
@@ -222,25 +222,25 @@ const MealPlansPage = () => {
 
                   <div className="p-8 flex flex-col flex-1">
                     <h3 className="text-white font-black text-xl mb-3 group-hover:text-orange-400 transition-colors">
-                      {plan.title}
+                      {pkg.title}
                     </h3>
-                    <p className="text-gray-500 text-xs font-medium mb-6 line-clamp-2 leading-relaxed">{plan.description}</p>
+                    <p className="text-gray-500 text-xs font-medium mb-6 line-clamp-2 leading-relaxed">{pkg.description}</p>
 
                     <div className="grid grid-cols-4 gap-3 mb-8">
                       <div className="bg-gray-900/50 rounded-2xl p-2 text-center border border-gray-700/50">
-                        <p className="text-orange-400 font-black text-sm">{plan.calories}</p>
+                        <p className="text-orange-400 font-black text-sm">{pkg.calories}</p>
                         <p className="text-gray-600 text-[9px] font-black uppercase tracking-tighter">cal</p>
                       </div>
                       <div className="bg-gray-900/50 rounded-2xl p-2 text-center border border-gray-700/50">
-                        <p className="text-blue-400 font-black text-sm">{plan.protein}g</p>
+                        <p className="text-blue-400 font-black text-sm">{pkg.protein}g</p>
                         <p className="text-gray-600 text-[9px] font-black uppercase tracking-tighter">prot</p>
                       </div>
                       <div className="bg-gray-900/50 rounded-2xl p-2 text-center border border-gray-700/50">
-                        <p className="text-green-400 font-black text-sm">{plan.duration_days}</p>
+                        <p className="text-green-400 font-black text-sm">{pkg.duration_days}</p>
                         <p className="text-gray-600 text-[9px] font-black uppercase tracking-tighter">days</p>
                       </div>
                       <div className="bg-gray-900/50 rounded-2xl p-2 text-center border border-gray-700/50">
-                        <p className="text-yellow-400 font-black text-sm">{plan.meals_per_day}</p>
+                        <p className="text-yellow-400 font-black text-sm">{pkg.meals_per_day}</p>
                         <p className="text-gray-600 text-[9px] font-black uppercase tracking-tighter">meals</p>
                       </div>
                     </div>
@@ -248,11 +248,11 @@ const MealPlansPage = () => {
                     <div className="mt-auto pt-6 border-t border-gray-700/50">
                       {locked ? (
                         <button
-                          onClick={(e) => handleUnlock(e, plan.id)}
-                          disabled={unlockingId === plan.id}
+                          onClick={(e) => handleUnlock(e, pkg.id)}
+                          disabled={unlockingId === pkg.id}
                           className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center space-x-2 transition-all shadow-lg shadow-blue-600/20"
                         >
-                          {unlockingId === plan.id ? (
+                          {unlockingId === pkg.id ? (
                             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                           ) : (
                             <>

@@ -65,7 +65,7 @@ export default function BlogPage() {
             The <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-pink-600">Elite</span> Journal
           </h1>
           <p className="text-xl text-slate-400 max-w-2xl leading-relaxed">
-            Science-backed fitness protocols, nutrition blueprints, and professional performance strategies for the modern athlete.
+            Science-backed fitness Packages, nutrition blueprints, and professional performance strategies for the modern athlete.
           </p>
         </div>
       </div>

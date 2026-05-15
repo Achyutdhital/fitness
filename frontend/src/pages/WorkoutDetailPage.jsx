@@ -344,7 +344,7 @@ const WorkoutDetailPage = () => {
                     <FiLock />
                     <div>
                       <p className="font-semibold">Locked</p>
-                      <p className="text-xs text-yellow-100/80">Renew your plan to continue.</p>
+                      <p className="text-xs text-yellow-100/80">Renew your pkg to continue.</p>
                     </div>
                   </div>
                   <Link to="/subscriptions" className="btn btn-primary w-full block text-center">

@@ -248,7 +248,7 @@ const EnhancedDashboard = () => {
             transition={{ delay: 0.4 }}
             className="space-y-6"
           >
-            {/* Current Plan */}
+            {/* Current pkg */}
             <div className={`bg-gradient-to-br ${currentTier === 'Free' ? 'from-slate-600 to-slate-700' : currentTier === 'Pro' ? 'from-purple-600 to-indigo-600' : 'from-orange-600 to-pink-600'} rounded-2xl p-6 text-white`}>
               <p className="text-sm opacity-80 mb-1">Current Plan</p>
               <h3 className="text-3xl font-black mb-4">{currentTier}</h3>

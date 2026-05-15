@@ -48,7 +48,7 @@ const ResetPasswordPage = () => {
       >
         <div className="bg-slate-900/50 backdrop-blur-2xl rounded-[2.5rem] border border-slate-800/50 p-8 md:p-12 shadow-2xl">
           <div className="text-center mb-10">
-            <h1 className="text-3xl font-black text-white mb-2 tracking-tight">Create <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-pink-500">Protocol</span></h1>
+            <h1 className="text-3xl font-black text-white mb-2 tracking-tight">Create <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-pink-500">Package</span></h1>
             <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Set a new password for your account</p>
           </div>
 

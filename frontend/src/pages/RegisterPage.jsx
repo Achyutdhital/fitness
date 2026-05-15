@@ -54,7 +54,7 @@ const RegisterPage = () => {
         if (loginResult.success) {
           // If they were trying to subscribe, go to payment
           if (selectedPlan) {
-            navigate('/payment', { state: { plan: selectedPlan } })
+            navigate('/payment', { state: { pkg: selectedPlan } })
           } else {
             navigate('/dashboard')
           }
@@ -91,7 +91,7 @@ const RegisterPage = () => {
               </div>
               <span className="text-2xl font-black text-white tracking-tighter uppercase">FitCoach<span className="text-orange-500">Pro</span></span>
             </Link>
-            <h1 className="text-4xl font-black text-white mb-2 tracking-tight">Initiate <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-pink-500">Protocol</span></h1>
+            <h1 className="text-4xl font-black text-white mb-2 tracking-tight">Initiate <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-pink-500">Package</span></h1>
             <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Your journey to the Elite 1% starts here</p>
           </div>
 

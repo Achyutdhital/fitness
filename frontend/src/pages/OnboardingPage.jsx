@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FiChevronRight, FiChevronLeft } from 'react-icons/fi'
 
 const OnboardingPage = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const [currentStep, setCurrentStep] = useState(0)
   const [formData, setFormData] = useState({
     gender: '',
@@ -96,7 +97,7 @@ const OnboardingPage = () => {
     {
       id: 'dietary_preference',
       title: 'Any dietary preferences?',
-      description: 'For meal plan recommendations',
+      description: 'For meal pkg recommendations',
       type: 'buttons',
       options: [
         { value: 'omnivore', label: '🍗 Omnivore' },
@@ -179,8 +180,12 @@ const OnboardingPage = () => {
     if (validateStep()) {
       if (currentStep === steps.length - 1) {
         // All steps completed - save data and redirect to signup
-        sessionStorage.setItem('onboarding_data', JSON.stringify(formData))
-        navigate('/signup', { state: { onboarding_data: formData } })
+        const dataToSave = { 
+          ...formData,
+          pkg: location.state?.plan || null
+        }
+        sessionStorage.setItem('onboarding_data', JSON.stringify(dataToSave))
+        navigate('/signup', { state: { onboarding_data: dataToSave, pkg: location.state?.plan } })
       } else {
         setCurrentStep(currentStep + 1)
       }

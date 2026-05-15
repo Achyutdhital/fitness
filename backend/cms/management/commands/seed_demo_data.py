@@ -272,11 +272,11 @@ class Command(BaseCommand):
             },
             {
                 'name': 'elite',
-                'description': 'For the transformation-committed client. A dedicated coach who knows your name, your schedule, and your body. 3 sessions per week, daily messaging, rapid adjustments, and full accountability.',
+                'description': 'For the transformation-committed client. A dedicated coach who knows your name, your schedule, and your body. 1 live 1-on-1 session per month, daily messaging, rapid adjustments, and full accountability.',
                 'features': [
                     '✅ Everything in Pro',
                     '✅ DEDICATED personal coach (assigned, fewer clients)',
-                    '✅ 3 live coaching sessions per week (45 min each)',
+                    '✅ 1 live coaching session per month (45 min)',
                     '✅ Daily form check & feedback (submit anytime)',
                     '✅ Direct daily messaging — coach replies within 2h, 7 days',
                     '✅ Emergency plan adjustment within 24h anytime',
@@ -284,7 +284,8 @@ class Command(BaseCommand):
                     '✅ Monthly body composition review & goal reset',
                     '✅ Priority access to new programs & features first',
                 ],
-                'sessions_per_week': 3,
+                'sessions_per_week': 1,
+                'video_sessions_per_month': 1,
                 'priority': 3,
                 'plans': [
                     {'cycle': 'monthly', 'price': '99.99', 'days': 30},
@@ -301,6 +302,8 @@ class Command(BaseCommand):
                     'description': t_data['description'],
                     'features': t_data['features'],
                     'sessions_per_week': t_data['sessions_per_week'],
+                    'video_sessions_per_month': t_data.get('video_sessions_per_month', 0),
+                    'custom_hourly_rate': '40.00' if t_data['name'] == 'elite' else '0.00',
                     'priority': t_data['priority'],
                 }
             )

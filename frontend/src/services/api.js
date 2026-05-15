@@ -63,13 +63,13 @@ export const authAPI = {
 // Subscription APIs
 export const subscriptionAPI = {
   getTiers: () => api.get('/subscriptions/tiers/'),
-  getPlans: () => api.get('/subscriptions/plans/'),
-  getPlanDetails: (id) => api.get(`/subscriptions/plans/${id}/`),
-  createPlan: (data) => api.post('/subscriptions/plans/', data),
-  updatePlan: (id, data) => api.patch(`/subscriptions/plans/${id}/`, data),
-  deletePlan: (id) => api.delete(`/subscriptions/plans/${id}/`),
+  getPackages: () => api.get('/subscriptions/packages/'),
+  getPackageDetails: (id) => api.get(`/subscriptions/packages/${id}/`),
+  createpkg: (data) => api.post('/subscriptions/packages/', data),
+  updatepkg: (id, data) => api.patch(`/subscriptions/packages/${id}/`, data),
+  deletepkg: (id) => api.delete(`/subscriptions/packages/${id}/`),
   getFeatures: () => api.get('/subscriptions/features/'),
-  comparePlans: () => api.get('/subscriptions/plans/compare/'),
+  comparePackages: () => api.get('/subscriptions/packages/compare/'),
 }
 
 // Workout APIs
@@ -93,9 +93,9 @@ export const workoutAPI = {
   getStats: () => api.get('/workouts/progress/stats/'),
   getMealPlans: (params) => api.get('/workouts/meal-plans/', { params }),
   getMealPlanDetails: (id) => api.get(`/workouts/meal-plans/${id}/`),
-  createMealPlan: (data) => api.post('/workouts/meal-plans/', data),
-  updateMealPlan: (id, data) => api.patch(`/workouts/meal-plans/${id}/`, data),
-  deleteMealPlan: (id) => api.delete(`/workouts/meal-plans/${id}/`),
+  createMealpkg: (data) => api.post('/workouts/meal-plans/', data),
+  updateMealpkg: (id, data) => api.patch(`/workouts/meal-plans/${id}/`, data),
+  deleteMealpkg: (id) => api.delete(`/workouts/meal-plans/${id}/`),
   getPrograms: () => api.get('/workouts/programs/'),
   getProgramDetails: (id) => api.get(`/workouts/programs/${id}/`),
   getMyMealPlans: () => api.get('/workouts/meal-plans/my_plans/'),
@@ -103,23 +103,23 @@ export const workoutAPI = {
 
 // Payment APIs
 export const paymentAPI = {
-  createPaymentIntent: (planOrPayload, couponCode = '') => {
-    if (planOrPayload && typeof planOrPayload === 'object' && !Array.isArray(planOrPayload)) {
-      const payload = { ...planOrPayload }
+  createPaymentIntent: (pkgOrPayload, couponCode = '') => {
+    if (pkgOrPayload && typeof pkgOrPayload === 'object' && !Array.isArray(pkgOrPayload)) {
+      const payload = { ...pkgOrPayload }
       if (couponCode && !payload.coupon_code) {
         payload.coupon_code = couponCode
       }
       return api.post('/payments/payments/create_payment_intent/', payload)
     }
 
-    return api.post('/payments/payments/create_payment_intent/', { plan_id: planOrPayload, coupon_code: couponCode })
+    return api.post('/payments/payments/create_payment_intent/', { plan_id: pkgOrPayload, coupon_code: couponCode })
   },
-  confirmPayment: (paymentIntentId, planOrPayload) => {
-    if (planOrPayload && typeof planOrPayload === 'object' && !Array.isArray(planOrPayload)) {
-      return api.post('/payments/payments/confirm_payment/', { payment_intent_id: paymentIntentId, ...planOrPayload })
+  confirmPayment: (paymentIntentId, pkgOrPayload) => {
+    if (pkgOrPayload && typeof pkgOrPayload === 'object' && !Array.isArray(pkgOrPayload)) {
+      return api.post('/payments/payments/confirm_payment/', { payment_intent_id: paymentIntentId, ...pkgOrPayload })
     }
 
-    return api.post('/payments/payments/confirm_payment/', { payment_intent_id: paymentIntentId, plan_id: planOrPayload })
+    return api.post('/payments/payments/confirm_payment/', { payment_intent_id: paymentIntentId, plan_id: pkgOrPayload })
   },
   getPayments: () => api.get('/payments/payments/my_payments/'),
   cancelSubscription: () => api.post('/payments/payments/cancel_subscription/', {}),
@@ -133,8 +133,8 @@ export const coreAPI = {
   // Favorites
   getFavoriteWorkouts: () => api.get('/core/favorites/workouts/'),
   toggleWorkoutFavorite: (workout_id) => api.post('/core/favorites/toggle_workout/', { workout_id }),
-  getFavoriteMealPlans: () => api.get('/core/favorites/meal_plans/'),
-  toggleMealPlanFavorite: (meal_plan_id) => api.post('/core/favorites/toggle_meal_plan/', { meal_plan_id }),
+  getFavoriteMealPackages: () => api.get('/core/favorites/meal_Packages/'),
+  toggleMealPackageFavorite: (meal_Package_id) => api.post('/core/favorites/toggle_meal_Package/', { meal_Package_id }),
 
   // Reviews
   submitReview: (workout_id, rating, comment) => api.post('/core/reviews/submit/', { workout_id, rating, comment }),
@@ -168,7 +168,7 @@ export const coreAPI = {
   cancelSession: (id) => api.post(`/core/sessions/${id}/cancel/`),
 
   // Coupons
-  validateCoupon: (code, plan_id) => api.post('/core/coupons/validate/', { code, plan_id }),
+  validateCoupon: (code, Package_id) => api.post('/core/coupons/validate/', { code, Package_id }),
 
   // Referrals
   getMyReferral: () => api.get('/core/referrals/my_referral/'),

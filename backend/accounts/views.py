@@ -366,6 +366,18 @@ class UserViewSet(viewsets.ViewSet):
         })
 
     @action(detail=False, methods=['get'])
+    def subscription(self, request):
+        """Get user subscription details"""
+        from accounts.models import UserSubscription
+        from accounts.serializers import UserSubscriptionSerializer
+        
+        try:
+            subscription = request.user.subscription
+            return Response(UserSubscriptionSerializer(subscription).data)
+        except UserSubscription.DoesNotExist:
+            return Response({'error': 'No subscription found'}, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=False, methods=['get'])
     def dashboard_stats(self, request):
         """Full stats for the dashboard"""
         from workouts.models import UserWorkoutProgress

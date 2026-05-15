@@ -1,6 +1,7 @@
 import stripe
 import json
 from decimal import Decimal
+import logging
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.conf import settings
@@ -17,16 +18,21 @@ from subscriptions.models import SubscriptionPlan
 from core.models import Coupon, CoachPayout
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
+logger = logging.getLogger(__name__)
 
 
 class PaymentViewSet(viewsets.ViewSet):
     """Handle payments and subscriptions"""
     permission_classes = [IsAuthenticated]
 
-    def _get_custom_coach_base_plan(self, base_plan_id=None):
+    def _get_custom_coach_base_plan(self, base_plan_id=None, billing_cycle=None):
         queryset = SubscriptionPlan.objects.filter(is_active=True, tier__name='elite')
         if base_plan_id:
             plan = queryset.filter(id=base_plan_id).first()
+            if plan:
+                return plan
+        if billing_cycle:
+            plan = queryset.filter(billing_cycle=str(billing_cycle).lower()).first()
             if plan:
                 return plan
         return queryset.order_by('price').first()
@@ -35,11 +41,43 @@ class PaymentViewSet(viewsets.ViewSet):
         sessions_per_week = Decimal(str(custom_package.get('sessions_per_week') or 0))
         session_duration_minutes = Decimal(str(custom_package.get('session_duration_minutes') or 0))
         hourly_rate = Decimal(str(custom_package.get('hourly_rate') or 0))
+        billing_cycle = str(custom_package.get('billing_cycle') or 'monthly').lower()
+        cycle_discount_map = {
+            'monthly': Decimal('1'),
+            'quarterly': Decimal('0.95'),
+            'yearly': Decimal('0.90'),
+        }
+        cycle_weeks_map = {
+            'monthly': Decimal('4'),
+            'quarterly': Decimal('13'),
+            'yearly': Decimal('52'),
+        }
+        cycle_weeks = cycle_weeks_map.get(billing_cycle, Decimal('4'))
+        cycle_discount = cycle_discount_map.get(billing_cycle, Decimal('1'))
         weekly_hours = (sessions_per_week * session_duration_minutes) / Decimal('60')
         weekly_addon = (weekly_hours * hourly_rate).quantize(Decimal('0.01'))
-        monthly_addon = (weekly_addon * Decimal('4')).quantize(Decimal('0.01'))
-        total = (Decimal(str(base_price)) + monthly_addon).quantize(Decimal('0.01'))
-        return total, weekly_addon, monthly_addon
+        cycle_addon = (weekly_addon * cycle_weeks * cycle_discount).quantize(Decimal('0.01'))
+        total = (Decimal(str(base_price)) + cycle_addon).quantize(Decimal('0.01'))
+        return total, weekly_addon, cycle_addon
+
+    def _get_custom_hourly_rate(self, base_plan):
+        tier_rate = getattr(base_plan.tier, 'custom_hourly_rate', None) if base_plan and base_plan.tier else None
+        if tier_rate is not None:
+            return Decimal(str(tier_rate))
+        return Decimal('0')
+
+    def _get_tier_rank(self, tier_name):
+        """Return numeric rank for tier (lower=cheaper, higher=premium)"""
+        if not tier_name:
+            return -1
+        tier_map = {
+            'free': 0,
+            'basic': 1,
+            'pro': 2,
+            'elite': 3,
+            'custom': 4,
+        }
+        return tier_map.get(tier_name.lower(), -1)
 
     def _assign_coach_round_robin(self, client):
         from accounts.models import CustomUser
@@ -92,6 +130,11 @@ class PaymentViewSet(viewsets.ViewSet):
     def create_payment_intent(self, request):
         """Create a Stripe payment intent for subscription"""
         user = request.user
+        # Log incoming request keys (avoid logging sensitive payment details)
+        try:
+            logger.debug('create_payment_intent request.data keys: %s', list(request.data.keys()))
+        except Exception:
+            logger.exception('Failed to log request.data keys for create_payment_intent')
         plan_id = request.data.get('plan_id')
         coupon_code = request.data.get('coupon_code')
         custom_package = request.data.get('custom_package') or {}
@@ -106,20 +149,27 @@ class PaymentViewSet(viewsets.ViewSet):
                 plan = SubscriptionPlan.objects.get(id=plan_id)
                 total_price = plan.price
             else:
-                custom_base_plan = self._get_custom_coach_base_plan(custom_package.get('base_plan_id'))
+                custom_base_plan = self._get_custom_coach_base_plan(custom_package.get('base_plan_id'), custom_package.get('billing_cycle'))
                 if not custom_base_plan:
                     return Response(
                         {'error': 'Elite base plan not found for custom coaching'},
                         status=status.HTTP_404_NOT_FOUND
                     )
                 plan = custom_base_plan
-                total_price, weekly_addon, monthly_addon = self._calculate_custom_coach_amount(plan.price, custom_package)
+                hourly_rate = self._get_custom_hourly_rate(plan)
+                sanitized_custom_package = {
+                    **custom_package,
+                    'hourly_rate': str(hourly_rate),
+                }
+                total_price, weekly_addon, monthly_addon = self._calculate_custom_coach_amount(plan.price, sanitized_custom_package)
                 custom_package = {
                     **custom_package,
                     'base_plan_id': str(plan.id),
                     'base_plan_name': plan.name,
                     'base_price': str(plan.price),
+                    'hourly_rate': str(hourly_rate),
                     'weekly_addon': str(weekly_addon),
+                    'billing_cycle_addon': str(monthly_addon),
                     'monthly_addon': str(monthly_addon),
                     'total_price': str(total_price),
                 }
@@ -130,7 +180,10 @@ class PaymentViewSet(viewsets.ViewSet):
             )
         
         try:
+            # Preview payload (safe fields only)
+            logger.debug('create_payment_intent payload preview: plan_id=%s coupon=%s is_custom=%s', plan_id, coupon_code, bool(custom_package))
             # Create or get Stripe customer
+            logger.info('create_payment_intent: user_id=%s plan=%s is_custom=%s', user.id, getattr(plan, 'id', None), is_custom)
             if not hasattr(user, 'subscription') or not user.subscription.stripe_customer_id:
                 customer = stripe.Customer.create(
                     email=user.email,
@@ -157,6 +210,7 @@ class PaymentViewSet(viewsets.ViewSet):
             if is_custom:
                 metadata.update({
                     'package_type': 'custom',
+                    'custom_billing_cycle': str(custom_package.get('billing_cycle', 'monthly')),
                     'custom_sessions_per_week': str(custom_package.get('sessions_per_week', '0')),
                     'custom_session_duration_minutes': str(custom_package.get('session_duration_minutes', '0')),
                     'custom_hourly_rate': str(custom_package.get('hourly_rate', '0')),
@@ -169,6 +223,7 @@ class PaymentViewSet(viewsets.ViewSet):
                 customer=customer_id,
                 metadata=metadata,
             )
+            logger.info('PaymentIntent created: user_id=%s intent_id=%s amount=%s metadata=%s', user.id, intent.id, amount, json.dumps(metadata))
             
             return Response({
                 'client_secret': intent.client_secret,
@@ -197,35 +252,97 @@ class PaymentViewSet(viewsets.ViewSet):
         
         try:
             intent = stripe.PaymentIntent.retrieve(payment_intent_id)
+            try:
+                logger.debug('confirm_payment request.data keys: %s', list(request.data.keys()))
+            except Exception:
+                logger.exception('Failed to log request.data keys for confirm_payment')
+            logger.info('confirm_payment: user_id=%s payment_intent_id=%s status=%s', user.id, payment_intent_id, getattr(intent, 'status', None))
+            try:
+                logger.debug('confirm_payment intent.metadata: %s', json.dumps(getattr(intent, 'metadata', {}) or {}))
+            except Exception:
+                logger.exception('Failed to stringify intent.metadata for %s', payment_intent_id)
             if plan_id:
                 plan = SubscriptionPlan.objects.get(id=plan_id)
             else:
-                plan = self._get_custom_coach_base_plan(custom_package.get('base_plan_id'))
+                plan = self._get_custom_coach_base_plan(custom_package.get('base_plan_id'), custom_package.get('billing_cycle'))
                 if not plan:
                     return Response({'error': 'Elite base plan not found for custom coaching'}, status=status.HTTP_404_NOT_FOUND)
             
             if intent.status == 'succeeded':
                 paid_amount = Decimal(str(intent.amount_received or intent.amount or 0)) / Decimal('100')
 
+                # Validate tier upgrade path (prevent downgrades & duplicate same-tier purchases)
+                is_custom = bool(custom_package or (intent.metadata or {}).get('package_type') == 'custom')
+                new_tier_name = plan.tier.name if plan.tier else 'free'
+                
+                # Check if user already has active/trial subscription
+                try:
+                    existing_sub = user.subscription
+                    existing_tier_name = existing_sub.tier.name if existing_sub.tier else 'free'
+                    existing_is_custom = existing_sub.is_custom
+                    is_expired = existing_sub.end_date and existing_sub.end_date < timezone.now()
+                    
+                    if not is_expired:
+                        # Active subscription exists - validate upgrade
+                        existing_rank = self._get_tier_rank(existing_tier_name)
+                        new_rank = self._get_tier_rank(new_tier_name)
+                        
+                        # Special case: custom users can re-purchase custom (upgrade sessions/duration)
+                        if existing_is_custom and is_custom:
+                            # Allow custom-to-custom upgrade (sessions/duration change)
+                            logger.info('confirm_payment: Allowing custom-to-custom upgrade for user %s', user.id)
+                        elif new_rank <= existing_rank:
+                            # Downgrade or same-tier attempt blocked
+                            tier_label = f"Custom ({custom_package.get('sessions_per_week')}x{custom_package.get('session_duration_minutes')}min)" if is_custom else new_tier_name.title()
+                            existing_label = f"Custom ({existing_sub.custom_config.get('sessions_per_week')}x{existing_sub.custom_config.get('session_duration_minutes')}min)" if existing_is_custom else existing_tier_name.title()
+                            return Response(
+                                {
+                                    'error': f'Cannot downgrade from {existing_label} to {tier_label}. You can only upgrade to a higher tier or wait for your current subscription to expire.',
+                                    'current_tier': existing_label,
+                                    'attempted_tier': tier_label,
+                                },
+                                status=status.HTTP_400_BAD_REQUEST
+                            )
+                        else:
+                            logger.info('confirm_payment: Allowing upgrade from %s to %s for user %s', existing_tier_name, new_tier_name, user.id)
+                except UserSubscription.DoesNotExist:
+                    # No existing subscription, allow purchase
+                    pass
+
                 # Create or update user subscription
                 user_subscription, created = UserSubscription.objects.get_or_create(
                     user=user,
                     defaults={
                         'subscription_plan': plan,
+                        'tier': plan.tier,
                         'stripe_customer_id': intent.customer,
                         'stripe_subscription_id': payment_intent_id,
                         'status': 'active',
+                        'is_custom': is_custom,
+                        'custom_config': custom_package if custom_package else None,
                         'start_date': timezone.now(),
                         'end_date': timezone.now() + timedelta(days=plan.duration_days)
                     }
                 )
                 
                 if not created:
+                    # Update plan and ensure Stripe identifiers are persisted
                     user_subscription.subscription_plan = plan
+                    user_subscription.tier = plan.tier
                     user_subscription.status = 'active'
+                    user_subscription.is_custom = bool(custom_package or (intent.metadata or {}).get('package_type') == 'custom')
+                    user_subscription.custom_config = custom_package if custom_package else None
                     user_subscription.start_date = timezone.now()
                     user_subscription.end_date = timezone.now() + timedelta(days=plan.duration_days)
+                    # Persist stripe customer/subscription ids if available
+                    try:
+                        if intent.customer:
+                            user_subscription.stripe_customer_id = intent.customer
+                        user_subscription.stripe_subscription_id = payment_intent_id
+                    except Exception:
+                        logger.exception('Failed to set stripe ids on UserSubscription for user %s', user.id)
                     user_subscription.save()
+                logger.info('UserSubscription updated: user_id=%s subscription_id=%s created=%s', user.id, user_subscription.id, created)
                 
                 # Auto-assign coach if Elite or Custom
                 if plan.tier and plan.tier.name in ['elite', 'custom'] and not user.assigned_coach:
@@ -249,6 +366,7 @@ class PaymentViewSet(viewsets.ViewSet):
                     payment_method='stripe_card',
                     description='Custom coaching package' if (custom_package or (intent.metadata or {}).get('package_type') == 'custom') else f"Subscription to {plan.name}"
                 )
+                logger.info('Payment record created: user_id=%s payment_id=%s amount=%s', user.id, payment.id, paid_amount)
 
                 coupon_code = (intent.metadata or {}).get('coupon_code')
                 if coupon_code:
@@ -289,6 +407,7 @@ class PaymentViewSet(viewsets.ViewSet):
                     due_date=(timezone.now() + timedelta(days=30)).date(),
                     paid_date=timezone.now().date()
                 )
+                logger.info('Invoice created: user_id=%s invoice_id=%s', user.id, invoice.id)
                 
                 return Response({
                     'message': 'Payment successful',

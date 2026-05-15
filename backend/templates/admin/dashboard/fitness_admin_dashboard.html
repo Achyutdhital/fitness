@@ -1,0 +1,244 @@
+{% load i18n %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% trans "Fitness Admin Dashboard" %}</title>
+  {% load static %}
+  <style>
+    :root {
+      --card-bg: #fff;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --brand: #2563eb;
+      --brand-2: #0ea5e9;
+      --shadow: 0 1px 2px rgba(0,0,0,0.04), 0 6px 14px rgba(0,0,0,0.06);
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #f6f7fb;
+      color: #111827;
+    }
+
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .title h1 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: -0.02em;
+    }
+
+    .title p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .role-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      white-space: nowrap;
+    }
+
+    .badge-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--brand);
+    }
+
+    .badge-text {
+      font-size: 13px;
+      color: #111827;
+      font-weight: 600;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .card {
+      grid-column: span 3;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      padding: 14px;
+      min-height: 92px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .card:before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(37,99,235,0.10), rgba(14,165,233,0.08));
+      pointer-events: none;
+    }
+
+    .card > * { position: relative; }
+
+    .card .k {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    .card .v {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 4px;
+    }
+
+    .card .s {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .section {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    .panel {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      padding: 14px;
+    }
+
+    .panel h2 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      letter-spacing: -0.01em;
+    }
+
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .link {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      text-decoration: none;
+      color: #111827;
+      background: #ffffff;
+    }
+
+    .link:hover {
+      border-color: rgba(37,99,235,0.35);
+      box-shadow: 0 6px 18px rgba(37,99,235,0.12);
+      transform: translateY(-1px);
+    }
+
+    .link .t {
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .subrow {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    @media (max-width: 1020px) {
+      .card { grid-column: span 4; }
+    }
+    @media (max-width: 760px) {
+      .wrap { padding: 16px; }
+      .card { grid-column: span 6; }
+      .topbar { flex-direction: column; align-items: flex-start; }
+      .role-badge { width: fit-content; }
+    }
+    @media (max-width: 520px) {
+      .card { grid-column: span 12; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="title">
+        <h1>{% if role == 'trainer' %}{% trans "Trainer Dashboard" %}{% else %}{% trans "Admin Dashboard" %}{% endif %}</h1>
+        <p>{% trans "Dynamic KPIs and quick links for fast operations." %}</p>
+      </div>
+
+      <div class="role-badge">
+        <span class="badge-dot" style="background: {% if role == 'trainer' %}var(--brand-2){% else %}var(--brand){% endif %}"></span>
+        <span class="badge-text">
+          {% if role == 'trainer' %}{% trans "Trainer mode" %}{% else %}{% trans "Admin mode" %}{% endif %}
+          {% if unread_notifications and role != 'trainer' %}
+            • {% trans "Unread" %}: {{ unread_notifications }}
+          {% endif %}
+        </span>
+      </div>
+    </div>
+
+    <div class="grid">
+      {% for c in cards %}
+        <div class="card">
+          <div class="k">{{ c.title }}</div>
+          <div class="v">{{ c.value }}</div>
+          {% if c.subtitle %}
+            <div class="s">{{ c.subtitle }}</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="section">
+      <div class="panel">
+        <h2>{% trans "Quick Links" %}</h2>
+        <div class="links">
+          {% for l in quick_links %}
+            <a class="link" href="{{ l.url }}">
+              <span class="t">{{ l.label }}</span>
+            </a>
+          {% endfor %}
+        </div>
+        <div class="subrow">{% trans "All links open Django admin sections." %}</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+
